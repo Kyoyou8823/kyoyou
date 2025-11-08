@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ホットライン運用ミニマム導入提案</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+/* 1. THE SETUP */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  /* ページ送りではなく、各スライドを縦に並べて表示するデモ用のスタイル */
+  background-color: #f0f2f5;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+  margin: 0;
+  min-height: 100vh;
+  padding: 20px 0;
+  place-items: center;
+}
+
+.slide-container {
+  /* 16:9 のサイズ比 */
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 720px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 60px;
+  position: relative;
+  width: 1280px;
+}
+
+/* 1.1 BACKGROUND STYLING (ミニマル＆カラフルな装飾) */
+
+.slide-container::before {
+  content: '';
+  height: 8px;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  /* カラフルなアクセント */
+  background: linear-gradient(90deg, #4ECDC4, #45B7D1, #FF6B6B, #F7DC6F, #9B59B6);
+}
+
+.slide-container[data-layout="title"]::before {
+  height: 100%;
+  width: 100%;
+  background: #FFFFFF;
+  z-index: 0;
+}
+
+/* カラフルな背景図形 (Title Slide用) */
+.slide-container[data-layout="title"]::after {
+    content: '';
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background-color: #4ECDC4;
+    border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+    opacity: 0.8;
+    left: 10%;
+    top: 15%;
+    animation: morph 8s ease-in-out infinite;
+}
+
+.title-shape-2 {
+    content: '';
+    position: absolute;
+    width: 150px;
+    height: 150px;
+    background-color: #FF6B6B;
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    opacity: 0.7;
+    right: 15%;
+    bottom: 20%;
+    z-index: 0;
+    animation: morph 10s ease-in-out infinite reverse;
+}
+
+@keyframes morph {
+    0% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; transform: rotate(0deg) scale(1); }
+    50% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: rotate(180deg) scale(1.1); }
+    100% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; transform: rotate(360deg) scale(1); }
+}
+
+
+.slide-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 2. CONSISTENT TYPOGRAPHY (ミニマルなフォント) */
+
+.slide-container h1,
+.slide-container h2,
+.slide-container h3 {
+  color: #1E293B;
+  font-weight: 700;
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+}
+
+.slide-container p,
+.slide-container li,
+.slide-container .subtitle,
+.slide-container th,
+.slide-container td,
+.slide-container .bar .label,
+.slide-container .timeline-item p,
+.slide-container .number-label {
+  color: #475569;
+  font-family: 'Lato', sans-serif;
+}
+
+/* Consistent Font Sizes */
+.slide-container h1 {
+  font-size: 72px;
+}
+
+.slide-container .slide-title {
+  /* This is an h2 */
+  font-size: 44px;
+  font-weight: 700;
+  margin-bottom: 40px;
+  text-align: left;
+  width: 100%;
+}
+
+.slide-container h3 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+.slide-container p,
+.slide-container li,
+.slide-container .subtitle,
+.slide-container th,
+.slide-container td,
+.slide-container .timeline-item p {
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.slide-container .subtitle {
+  font-size: 24px;
+  font-weight: 400;
+  margin: 20px auto;
+}
+
+.slide-container .content-area {
+  align-items: center;
+  display: flex;
+  flex-grow: 1;
+  justify-content: center;
+  width: 100%;
+}
+
+/* 3. LAYOUT DEFINITIONS */
+
+/* Title_Slide */
+.title-layout {
+  text-align: center;
+}
+.title-layout h1 {
+    font-size: 80px;
+    line-height: 1.2;
+}
+.title-layout .subtitle {
+    font-size: 28px;
+    color: #475569;
+}
+
+
+/* Tiled_Text_With_Icons */
+.tiled-content {
+  align-items: stretch;
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+  width: 100%;
+}
+
+.tile {
+  align-items: center;
+  background-color: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: flex-start;
+  padding: 30px;
+  text-align: center;
+}
+
+/* 課題スライド用の特別スタイル */
+.tile.issue-tile {
+    border-top: 8px solid #FF6B6B; /* 課題のアクセントカラー */
+    background-color: #fff8f8;
+}
+
+.tile .icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+.tile.issue-tile .icon {
+    color: #FF6B6B;
+}
+.tile.issue-tile h3 {
+    color: #D94A4A;
+}
+
+/* Highlighted_Numbers (テキスト版に改造) */
+.two-column {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  width: 100%;
+}
+
+.highlight-box {
+    text-align: center;
+    padding: 30px;
+    border-radius: 12px;
+    height: 100%;
+}
+.highlight-box.before {
+    background-color: #fff8f8;
+    border: 2px solid #FF6B6B;
+}
+.highlight-box.after {
+    background-color: #f6fffc;
+    border: 2px solid #4ECDC4;
+}
+.highlight-box h3 {
+    font-size: 24px;
+    font-weight: 700;
+}
+.highlight-box p {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1E293B;
+}
+.highlight-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 60px;
+    color: #475569;
+}
+
+/* Image_Right_Text_Left (インフォグラフィック用) */
+.two-column.info-layout {
+    grid-template-columns: 1.2fr 1fr; /* テキスト領域を少し広めに */
+    align-items: center; /* 垂直方向中央揃えに設定 */
+}
+
+.info-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    width: 100%;
+    height: 100%;
+    padding-top: 20px;
+}
+.info-box {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #f8fafc;
+    padding: 15px 20px;
+    border-radius: 8px;
+    width: 90%;
+    border: 1px solid #e2e8f0;
+}
+.info-box .icon {
+    font-size: 32px;
+    flex-shrink: 0;
+    width: 50px;
+    text-align: center;
+}
+.info-box .icon.fa-school { color: #3498DB; }
+.info-box .icon.fa-rotate { color: #9B59B6; }
+.info-box .icon.fa-microphone { color: #E67E22; }
+.info-box .icon.fa-slack { color: #D94A4A; }
+
+.info-arrow {
+    font-size: 24px;
+    color: #9B59B6;
+    margin: 5px 0;
+}
+
+/* Styled_Bullet_Points */
+.bullet-list {
+  max-width: 900px;
+  width: 100%;
+}
+.bullet-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bullet-list li {
+  align-items: flex-start;
+  display: flex;
+  gap: 20px;
+  margin-bottom: 25px;
+  padding-left: 0;
+  position: relative;
+}
+.bullet-list i {
+  color: #FFFFFF;
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-top: 5px;
+}
+/* カラフルなアイコン背景 */
+.bullet-list li:nth-child(1) i { background-color: #4ECDC4; }
+.bullet-list li:nth-child(2) i { background-color: #FF6B6B; }
+.bullet-list li:nth-child(3) i { background-color: #F7DC6F; }
+
+.bullet-list li div {
+    flex-grow: 1;
+}
+.bullet-list li strong {
+  color: #1E293B;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  display: block;
+  margin-bottom: 5px;
+}
+.bullet-list li p {
+    margin: 0;
+}
+
+/* Timeline (縦型フローチャートに改造) */
+.flow-layout {
+  display: flex;
+  flex-direction: column;
+  width: 70%;
+  position: relative;
+  gap: 10px;
+}
+.flow-layout::before {
+    content: '';
+    position: absolute;
+    left: 40px;
+    top: 20px;
+    bottom: 20px;
+    width: 4px;
+    background-color: #e2e8f0;
+    z-index: 0;
+}
+.flow-item {
+    position: relative;
+    padding-left: 100px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.flow-item::before {
+    content: '';
+    position: absolute;
+    left: 28px; /* 40px - (24px/2) + 2px border */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: #FFFFFF;
+    border: 4px solid #9B59B6; /* フローの色 */
+    z-index: 1;
+}
+.flow-item h3 {
+    font-size: 24px;
+    color: #1E293B;
+    margin-bottom: 5px;
+}
+.flow-item p {
+    font-size: 18px;
+    margin: 0;
+    color: #475569;
+}
+.flow-arrow {
+    position: relative;
+    padding-left: 100px;
+    text-align: left;
+    color: #9B59B6;
+    font-size: 24px;
+    margin: 5px 0;
+}
+
+/* Table */
+.table-layout {
+  width: 100%;
+}
+.table-layout table {
+  border-collapse: separate;
+  border-spacing: 0 10px;
+  width: 100%;
+}
+.table-layout th,
+.table-layout td {
+  padding: 20px 24px;
+  text-align: left;
+  vertical-align: top;
+}
+.table-layout th {
+  background-color: #f8fafc;
+  color: #1E293B;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'Poppins', sans-serif;
+  border-bottom: 2px solid #e2e8f0;
+}
+.table-layout td {
+    border-bottom: 1px solid #e2e8f0;
+}
+.table-layout tr td:first-child {
+    font-weight: 700;
+    color: #1E293B;
+}
+/* Before/After の色分け */
+.table-layout td:nth-child(2) {
+    background-color: #fff8f8;
+}
+.table-layout td:nth-child(3) {
+    background-color: #f6fffc;
+    font-weight: 700;
+    color: #047857;
+}
+
+/* Timeline */
+.timeline-layout {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  padding-top: 40px; /* 上下のマージンを確保 */
+}
+.timeline-layout .timeline-line {
+  background-color: #e2e8f0;
+  height: 4px;
+  left: 0;
+  position: absolute;
+  top: 50%; /* 中央 */
+  transform: translateY(-2px);
+  width: 100%;
+  z-index: 0;
+}
+.timeline-item {
+  position: relative;
+  text-align: center;
+  width: 18%; /* 5ステップ用に調整 */
+}
+.timeline-item::after {
+  background-color: #fff;
+  border-radius: 50%;
+  border: 4px solid #4ECDC4; /* ステップの色 */
+  content: attr(data-day); /* 日付を表示 */
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  color: #4ECDC4;
+  font-size: 16px;
+  height: 40px;
+  width: 40px;
+  display: grid;
+  place-items: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+.timeline-item .content-wrapper {
+  position: relative; /* z-indexを効かせるため */
+}
+/* 上下に交互配置 */
+.timeline-item:nth-child(odd) .content-wrapper {
+  bottom: 50%;
+  margin-bottom: 35px; /* ドットからの距離 */
+}
+.timeline-item:nth-child(even) .content-wrapper {
+  margin-top: 35px; /* ドットからの距離 */
+  top: 50%;
+}
+.timeline-item h3 {
+  color: #1E293B;
+  font-size: 20px;
+}
+.timeline-item p {
+    font-size: 16px;
+    margin: 0;
+}
+
+/* Two_Column_Tiled_Text */
+.two-column.tiled {
+  align-items: stretch;
+}
+.two-column.tiled > div {
+  background-color: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 30px;
+}
+.two-column.tiled h3 {
+    color: #1E293B;
+    border-bottom: 3px solid #F7DC6F; /* ルールのアクセント */
+    padding-bottom: 10px;
+}
+.two-column.tiled ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+.two-column.tiled li {
+    font-size: 18px;
+    padding-left: 30px;
+    position: relative;
+    margin-bottom: 15px;
+}
+.two-column.tiled li::before {
+    content: '\f00c'; /* check */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    color: #F7DC6F;
+    position: absolute;
+    left: 0;
+    top: 5px;
+}
+
+
+/* Q&A */
+.qa-layout {
+  text-align: center;
+  width: 100%;
+  align-self: center;
+}
+.qa-layout h2 {
+  font-size: 80px;
+  color: #1E293B;
+  margin-bottom: 20px;
+}
+.qa-layout p {
+  font-size: 24px;
+  color: #475569;
+}
+    </style>
+</head>
+<body>
+
+<div class="slide-container" id="slide1" data-layout="title">
+    <div class="title-shape-2"></div>
+    <div class="title-layout">
+        <h1>ホットライン運用の<br>ミニマム導入</h1>
+        <p class="subtitle">待機社員コストの削減提案</p>
+    </div>
+</div>
+
+<div class="slide-container" id="slide2">
+    <h2 class="slide-title">1. 現状の課題</h2>
+    <div class="content-area">
+        <div class="tiled-content">
+            <div class="tile issue-tile">
+                <div class="icon"><i class="fa-solid fa-clock"></i></div>
+                <h3>社員の稼働拘束</h3>
+                <p>待機のために社員が固定で拘束されている (週36〜42h)</p>
+            </div>
+            <div class="tile issue-tile">
+                <div class="icon"><i class="fa-solid fa-circle-question"></i></div>
+                <h3>対応レベル</h3>
+                <p>対応内容の多くが、現場で判断可能なレベルである</p>
+            </div>
+            <div class="tile issue-tile">
+                <div class="icon"><i class="fa-solid fa-user-lock"></i></div>
+                <h3>ノウハウの属人化</h3>
+                <p>対応ノウハウが個人に留まりやすく、組織に蓄積されない</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide3">
+    <h2 class="slide-title">提案：運用体制の切り替え</h2>
+    <div class="content-area">
+        <div class="two-column">
+            <div class="highlight-box before">
+                <h3>現状 (Before)</h3>
+                <p>待機社員の固定配置</p>
+            </div>
+            <div class="highlight-box after">
+                <h3>提案 (After)</h3>
+                <p>教室長ローテーション対応</p>
+            </div>
+        </div>
+    </div>
+    <p style="text-align: center; font-size: 22px; margin-top: 30px;">
+        → 拘束コストを削減しつつ、対応の統一感を保つ
+    </p>
+</div>
+
+<div class="slide-container" id="slide4">
+    <h2 class="slide-title">2. 新運用スキーム（ミニマム構成）</h2>
+    <div class="content-area">
+        <div class="two-column info-layout">
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                <ul style="list-style: none; padding-left: 0; margin: 0;">
+                    <li style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 25px;">
+                        <i class="fa-solid fa-mobile-screen-button" style="color: #4ECDC4; font-size: 24px; margin-top: 5px;"></i>
+                        <div><strong>専用スマホ配備:</strong> 各教室に1台配備。授業中はCFがストラップで携帯。</div>
+                    </li>
+                    <li style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 25px;">
+                        <i class="fa-solid fa-rotate" style="color: #9B59B6; font-size: 24px; margin-top: 5px;"></i>
+                        <div><strong>当番ローテーション:</strong> 現場で対応困難な場合のみ、当番教室長へ電話。当番は週単位。</div>
+                    </li>
+                    <li style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 25px;">
+                        <i class="fa-solid fa-microphone" style="color: #E67E22; font-size: 24px; margin-top: 5px;"></i>
+                        <div><strong>自動録音:</strong> 通話は自動録音し、事実確認や再発防止に利用。</div>
+                    </li>
+                    <li style="display: flex; align-items: flex-start; gap: 15px;">
+                        <i class="fa-brands fa-slack" style="color: #D94A4A; font-size: 24px; margin-top: 5px;"></i>
+                        <div><strong>Slack共有 (選択制):</strong> 必要なケースのみSlackへ投稿。</div>
+                    </li>
+                </ul>
+            </div>
+            <div class="info-diagram">
+                <div class="info-box">
+                    <div class="icon fa-solid fa-school"></div>
+                    <div><strong>各教室 (CF)</strong><br>スマホを携帯</div>
+                </div>
+                <div class="info-arrow"><i class="fa-solid fa-arrow-down"></i>（対応困難時のみ）</div>
+                <div class="info-box">
+                    <div class="icon fa-solid fa-rotate"></div>
+                    <div><strong>当番教室長</strong><br>週単位ローテーション</div>
+                </div>
+                <div class="info-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="info-box">
+                    <div class="icon fa-solid fa-microphone"></div>
+                    <div><strong>通話</strong><br>自動録音</div>
+                </div>
+                <div class="info-arrow"><i class="fa-solid fa-arrow-down"></i>（必要なケースのみ）</div>
+                <div class="info-box">
+                    <div class="icon fa-brands fa-slack"></div>
+                    <div><strong>Slack共有</strong><br>ナレッジ化</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide5">
+    <h2 class="slide-title">新運用のキーポイント</h2>
+    <div class="content-area">
+        <div class="bullet-list">
+            <ul>
+                <li>
+                    <i class="fa-solid fa-phone-flip"></i>
+                    <div>
+                        <strong>「迷ったら当番に電話」</strong>
+                        <p>想定カテゴリや権限線はあえて設けず、現場の迷いを即解消することを優先します。</p>
+                    </div>
+                </li>
+                <li>
+                    <i class="fa-solid fa-hands-clapping"></i>
+                    <div>
+                        <strong>「覚えました」スタンプ</strong>
+                        <p>Slack共有を読んだらスタンプ。これは「次回同様ケースは自分で対応できる」という意思表示とします。</p>
+                    </div>
+                </li>
+                 <li>
+                    <i class="fa-solid fa-microphone-lines"></i>
+                    <div>
+                        <strong>「自動録音」と「選択的共有」</strong>
+                        <p>全件録音で安心を担保しつつ、Slack共有は「必要なもののみ」に絞り、ノイズを減らします。</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide6">
+    <h2 class="slide-title">3. 運用フロー</h2>
+    <div class="content-area">
+        <div class="flow-layout">
+            <div class="flow-item">
+                <h3>現場（CFが専用スマホ携帯）</h3>
+            </div>
+            <div class="flow-arrow">
+                <i class="fa-solid fa-arrow-down-long"></i>
+                <p style="display: inline-block; margin-left: 10px;">（対応に迷う / 判断保留）</p>
+            </div>
+            <div class="flow-item">
+                <h3>当番教室長</h3>
+                <p>電話で対応・判断を支援</p>
+            </div>
+             <div class="flow-arrow">
+                <i class="fa-solid fa-arrow-down-long"></i>
+                <p style="display: inline-block; margin-left: 10px;">（必要なもののみ）</p>
+            </div>
+            <div class="flow-item">
+                <h3>Slack共有 ＋ 通話録音保存</h3>
+                <p>ナレッジとして蓄積</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide7">
+    <h2 class="slide-title">4. 期待される効果</h2>
+    <div class="content-area">
+        <div class="table-layout">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">項目</th>
+                        <th style="width: 37.5%;">現状 (Before)</th>
+                        <th style="width: 37.5%;">導入後 (After)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>待機体制</td>
+                        <td>待機社員が固定で拘束</td>
+                        <td>教室長ローテで分散</td>
+                    </tr>
+                    <tr>
+                        <td>稼働コスト</td>
+                        <td>週36〜42h の拘束発生</td>
+                        <td>拘束コスト大幅削減</td>
+                    </tr>
+                    <tr>
+                        <td>対応品質</td>
+                        <td>個人差あり</td>
+                        <td>録音＋共有により徐々に収束</td>
+                    </tr>
+                    <tr>
+                        <td>ナレッジ</td>
+                        <td>属人化しやすい</td>
+                        <td>必要ケースのみ蓄積される</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide8">
+    <h2 class="slide-title">5. 導入ステップ（1週間で実装可能）</h2>
+    <div class="content-area">
+        <div class="timeline-layout">
+            <div class="timeline-line"></div>
+            <div class="timeline-item" data-day="1">
+                <div class="content-wrapper">
+                    <h3>スマホ配備</h3>
+                    <p>SIM設定</p>
+                </div>
+            </div>
+            <div class="timeline-item" data-day="2">
+                <div class="content-wrapper">
+                    <h3>ルール共有</h3>
+                    <p>ストラップ＋携帯ルール</p>
+                </div>
+            </div>
+            <div class="timeline-item" data-day="3">
+                <div class="content-wrapper">
+                    <h3>ローテ表作成</h3>
+                    <p>教室長で作成</p>
+                </div>
+            </div>
+            <div class="timeline-item" data-day="4-7">
+                <div class="content-wrapper">
+                    <h3>試運転期間</h3>
+                    <p>小調整</p>
+                </div>
+            </div>
+             <div class="timeline-item" data-day="8">
+                <div class="content-wrapper">
+                    <h3>運用固定</h3>
+                    <p>本格スタート</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide9">
+    <h2 class="slide-title">6. 最小ルール</h2>
+    <div class="content-area">
+        <div class="two-column tiled">
+            <div>
+                <h3><i class="fa-solid fa-phone" style="margin-right: 10px;"></i> 現場でのルール</h3>
+                <ul>
+                    <li>授業中はCFがスマホを首から携帯</li>
+                    <li>対応に迷ったら当番教室長へ電話</li>
+                    <li>通話は自動録音される</li>
+                </ul>
+            </div>
+            <div>
+                <h3><i class="fa-solid fa-share-nodes" style="margin-right: 10px;"></i> 共有のルール</h3>
+                <ul>
+                    <li>共有すべき時のみ Slack へ投稿</li>
+                    <li>閲覧者は「覚えました」スタンプ</li>
+                    <li>（「覚えました」＝次回は自分で対応できる）</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide10">
+    <div class="qa-layout">
+        <h2>Q & A</h2>
+        <p>ご清聴ありがとうございました</p>
+    </div>
+</div>
+
+
+</body>
+</html>
