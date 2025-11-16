@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ルールは何でしょう？</title>
+    <!-- Tailwind CSS CDNをロード -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Interフォントを使用 -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* 薄いグレーの背景 */
+        }
+        .input-box {
+            /* 3桁の数字が入るように幅を調整 */
+            width: 100px; 
+            text-align: center;
+            font-size: 1.5rem; /* 大きめのフォントサイズ */
+        }
+        @media (max-width: 640px) {
+            .input-box {
+                /* モバイルでは少し狭めるが、3桁に対応できるよう80pxに設定 */
+                width: 80px; 
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-white p-6 md:p-8 rounded-2xl shadow-2xl space-y-6">
+        
+        <!-- タイトルとルール説明 -->
+        <h1 class="text-3xl font-bold text-gray-800 text-center border-b-2 pb-3 mb-4">
+            ルールは何でしょう？
+        </h1>
+
+        <!-- 例の表示 -->
+        <div class="space-y-2 p-4 bg-indigo-50 rounded-xl shadow-inner">
+            <div class="text-lg font-semibold text-indigo-700">例:</div>
+            <div class="flex justify-between items-center text-gray-700">
+                <span>2 → 4 → 6</span>
+                <span class="text-green-500 font-bold text-2xl">⭕️</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-700">
+                <span>3 → 6 → 9</span>
+                <span class="text-green-500 font-bold text-2xl">⭕️</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-700">
+                <span>5 → 10 → 15</span>
+                <span class="text-green-500 font-bold text-2xl">⭕️</span>
+            </div>
+        </div>
+
+        <!-- 入力フィールド -->
+        <div class="flex justify-center items-center space-x-2 md:space-x-4 mt-6">
+            <!-- 最初の数字 (A) -->
+            <input type="number" id="inputA" placeholder="A" class="input-box p-3 border-4 border-indigo-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500 transition duration-150">
+            <span class="text-2xl font-bold text-gray-500">→</span>
+            
+            <!-- 2番目の数字 (B) -->
+            <input type="number" id="inputB" placeholder="B" class="input-box p-3 border-4 border-indigo-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500 transition duration-150">
+            <span class="text-2xl font-bold text-gray-500">→</span>
+            
+            <!-- 3番目の数字 (C) -->
+            <input type="number" id="inputC" placeholder="C" class="input-box p-3 border-4 border-indigo-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500 transition duration-150">
+        </div>
+
+        <!-- ボタンコンテナ -->
+        <div class="flex justify-center space-x-4 mt-6">
+            <!-- 判定ボタン -->
+            <button id="checkButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition duration-300 transform hover:scale-105 active:scale-95">
+                判定
+            </button>
+            <!-- クリアボタン -->
+            <button id="clearButton" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition duration-300 transform hover:scale-105 active:scale-95">
+                クリア
+            </button>
+        </div>
+        
+        <!-- メッセージ表示エリア (エラーなど) -->
+        <div id="message" class="text-center text-red-500 font-medium h-6"></div>
+
+        <!-- 履歴表示エリア -->
+        <h2 class="text-xl font-semibold text-gray-800 pt-4 border-t border-gray-200">
+            履歴
+        </h2>
+        <div id="historyList" class="space-y-3 max-h-64 overflow-y-auto p-2">
+            <!-- 履歴アイテムがここに挿入されます -->
+        </div>
+    </div>
+
+    <script>
+        // DOM要素の取得
+        const inputA = document.getElementById('inputA');
+        const inputB = document.getElementById('inputB');
+        const inputC = document.getElementById('inputC');
+        const checkButton = document.getElementById('checkButton');
+        const clearButton = document.getElementById('clearButton');
+        const historyList = document.getElementById('historyList');
+        const messageDisplay = document.getElementById('message');
+
+        // 履歴を保持する配列 (localStorageは使わずセッション内のみ)
+        let history = [];
+
+        // 判定ルール: 3つのマス全てに自然数（1以上の整数）が入力されていれば ⭕️
+        function checkRule(a, b, c) {
+            // 入力値を数値に変換
+            const numA = Number(a);
+            const numB = Number(b);
+            const numC = Number(c);
+
+            // 1. 入力が空、または数値に変換できない場合は判定不能
+            if (a === "" || b === "" || c === "" || isNaN(numA) || isNaN(numB) || isNaN(numC)) {
+                return null; // 判定不能を示す
+            }
+
+            // 自然数判定ヘルパー関数: 整数であり、かつ1以上であること
+            const isNatural = (n) => Number.isInteger(n) && n >= 1;
+
+            // ルール判定: 3つの数字が全て自然数であること
+            return isNatural(numA) && isNatural(numB) && isNatural(numC);
+        }
+
+        // 判定処理を実行する関数
+        function handleCheck() {
+            // エラーメッセージをクリア
+            messageDisplay.textContent = '';
+            
+            const valA = inputA.value.trim();
+            const valB = inputB.value.trim();
+            const valC = inputC.value.trim();
+
+            const isCorrect = checkRule(valA, valB, valC);
+
+            // 判定結果を履歴に追加
+            if (isCorrect !== null) {
+                const resultText = isCorrect ? '⭕️' : '✖️';
+                const resultColor = isCorrect ? 'text-green-600' : 'text-red-600';
+                
+                const entry = {
+                    sequence: `${valA} → ${valB} → ${valC}`,
+                    result: resultText,
+                    color: resultColor
+                };
+                history.unshift(entry); // 新しいエントリをリストの先頭に追加
+                
+                renderHistory();
+                clearInputs(false); // 判定後は入力をクリア
+            } else {
+                messageDisplay.textContent = '3つの枠すべてに有効な数字を入力してください。';
+            }
+        }
+
+        // 入力フィールドをクリアする関数
+        function clearInputs(clearMessage = true) {
+            inputA.value = '';
+            inputB.value = '';
+            inputC.value = '';
+            if (clearMessage) {
+                 messageDisplay.textContent = '';
+            }
+        }
+
+        // 履歴リストをレンダリングする関数
+        function renderHistory() {
+            // 履歴リストを空にする
+            historyList.innerHTML = '';
+
+            if (history.length === 0) {
+                historyList.innerHTML = '<p class="text-center text-gray-500 italic">まだ判定された数列はありません。</p>';
+                return;
+            }
+
+            // 履歴配列からDOM要素を生成
+            history.forEach(entry => {
+                const listItem = document.createElement('div');
+                listItem.className = 'flex justify-between items-center p-3 bg-gray-50 border border-gray-200 rounded-lg shadow-sm';
+                
+                // 数列部分
+                const sequenceSpan = document.createElement('span');
+                sequenceSpan.className = 'text-lg text-gray-700 font-mono';
+                sequenceSpan.textContent = entry.sequence;
+                
+                // 判定結果 (⭕️/✖️) 部分
+                const resultSpan = document.createElement('span');
+                resultSpan.className = `font-bold text-2xl ${entry.color}`;
+                resultSpan.textContent = entry.result;
+
+                listItem.appendChild(sequenceSpan);
+                listItem.appendChild(resultSpan);
+                
+                historyList.appendChild(listItem);
+            });
+        }
+
+        // イベントリスナーの設定
+        checkButton.addEventListener('click', handleCheck);
+        clearButton.addEventListener('click', () => clearInputs(true));
+
+        // ページロード時に履歴を初期描画
+        document.addEventListener('DOMContentLoaded', renderHistory);
+    </script>
+</body>
+</html>
