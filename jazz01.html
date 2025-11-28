@@ -1,0 +1,472 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import * as Tone from 'tone';
+import { Music, Info, Volume2, Play, Square, Loader, Shuffle, ArrowUpRight } from 'lucide-react';
+
+// --- Music Theory Data ---
+const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+const SCALES = {
+  'minor-blues': {
+    name: 'Minor Blues',
+    intervals: [0, 3, 5, 6, 7, 10],
+    color: 'from-blue-900 to-slate-900',
+    accent: 'text-blue-400',
+    info: {
+      song: "Bag's Groove / Miles Davis",
+      artist: "Thelonious Monk, Miles Davis",
+      desc: "最もジャズらしい、泥臭くて渋いサウンド。迷ったらこれを選べば間違いなし。「ブルーノート」と呼ばれる音が特徴。",
+    }
+  },
+  'dorian': {
+    name: 'Dorian Mode',
+    intervals: [0, 2, 3, 5, 7, 9, 10],
+    color: 'from-purple-900 to-slate-900',
+    accent: 'text-purple-400',
+    info: {
+      song: "So What / Miles Davis",
+      artist: "Bill Evans, Herbie Hancock",
+      desc: "都会的でクール、少し哀愁のある響き。モダン・ジャズの金字塔的サウンド。",
+    }
+  },
+  'lydian': {
+    name: 'Lydian Mode',
+    intervals: [0, 2, 4, 6, 7, 9, 11],
+    color: 'from-pink-900 to-slate-900',
+    accent: 'text-pink-400',
+    info: {
+      song: "The Simpsons Theme",
+      artist: "Pat Metheny, Movie Scores",
+      desc: "明るいが、どこか浮遊感があり、夢の中にいるような不思議な響き。",
+    }
+  },
+  'major-pentatonic': {
+    name: 'Major Pentatonic',
+    intervals: [0, 2, 4, 7, 9],
+    color: 'from-green-900 to-slate-900',
+    accent: 'text-green-400',
+    info: {
+      song: "I Wish / Stevie Wonder",
+      artist: "Louis Armstrong, Gospel Music",
+      desc: "非常に明るく、ポジティブな響き。ポップスやゴスペルでも多用される親しみやすい音。",
+    }
+  },
+  'altered': {
+    name: 'Altered Scale',
+    intervals: [0, 1, 3, 4, 6, 8, 10],
+    color: 'from-red-900 to-slate-900',
+    accent: 'text-red-400',
+    info: {
+      song: "Jazz Solos (Dominant 7th)",
+      artist: "John Coltrane",
+      desc: "緊張感のある、少し危険な香り。アウトしているようで成立している、上級者の響き。",
+    }
+  }
+};
+
+// Keyboard mapping for PC users (Z row)
+const KEY_MAPPING = ['z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/'];
+
+// Utility: Fisher-Yates Shuffle
+const shuffleArray = (array) => {
+  const newArr = [...array];
+  for (let i = newArr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+  }
+  return newArr;
+};
+
+export default function JazzyTouch() {
+  const [isStarted, setIsStarted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [rootNote, setRootNote] = useState('C');
+  const [currentScaleKey, setCurrentScaleKey] = useState('minor-blues');
+  const [isRandomMode, setIsRandomMode] = useState(false);
+  const [activeNote, setActiveNote] = useState(null);
+  const [volume, setVolume] = useState(-10);
+  
+  // Displayed notes state
+  const [mappedNotes, setMappedNotes] = useState([]);
+
+  // Refs for Tone.js objects
+  const synthRef = useRef(null);
+  const bassSynthRef = useRef(null);
+  const drumSynthRef = useRef(null);
+  const hatSynthRef = useRef(null);
+  const loopRef = useRef(null);
+  const reverbRef = useRef(null);
+
+  const currentScale = SCALES[currentScaleKey];
+
+  // Initialize Audio
+  const initAudio = async () => {
+    await Tone.start();
+    
+    // Create Main Synth (Electric Piano Style)
+    const reverb = new Tone.Reverb({ decay: 4, wet: 0.3 }).toDestination();
+    reverbRef.current = reverb;
+
+    const synth = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 3,
+      modulationIndex: 10,
+      detune: 0,
+      oscillator: { type: "sine" },
+      envelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 1.2 },
+      modulation: { type: "square" },
+      modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }
+    }).connect(reverb);
+    synth.volume.value = volume;
+    synthRef.current = synth;
+
+    // Backing Instruments
+    const bassSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.05,
+      octaves: 4,
+      oscillator: { type: "sine" },
+      envelope: { attack: 0.01, decay: 0.4, sustain: 0.01, release: 1.4 },
+    }).toDestination();
+    bassSynth.volume.value = -5;
+    bassSynthRef.current = bassSynth;
+
+    const drumSynth = new Tone.MembraneSynth().toDestination();
+    drumSynth.volume.value = -12;
+    drumSynthRef.current = drumSynth;
+
+    const hatSynth = new Tone.NoiseSynth({
+      noise: { type: "white" },
+      envelope: { attack: 0.005, decay: 0.1, sustain: 0 },
+    }).toDestination();
+    hatSynth.volume.value = -20;
+    hatSynthRef.current = hatSynth;
+
+    setIsStarted(true);
+  };
+
+  // Generate Base Scale Notes
+  const getScaleNotes = useCallback(() => {
+    const rootIndex = NOTES.indexOf(rootNote);
+    const scale = SCALES[currentScaleKey];
+    let generatedNotes = [];
+    
+    // Generate 2 octaves
+    for (let octave = 3; octave <= 4; octave++) {
+      scale.intervals.forEach(interval => {
+        const noteIndex = (rootIndex + interval) % 12;
+        const noteName = NOTES[noteIndex];
+        generatedNotes.push({
+          note: noteName + octave,
+          label: noteName,
+          isRoot: interval === 0,
+          isBlue: (currentScaleKey === 'minor-blues' && interval === 6) // Highlight Blue Note
+        });
+      });
+    }
+    return generatedNotes;
+  }, [rootNote, currentScaleKey]);
+
+  // Update Mapped Notes when dependencies change
+  useEffect(() => {
+    const baseNotes = getScaleNotes();
+    if (isRandomMode) {
+      // Shuffle and take enough to fill the keyboard
+      setMappedNotes(shuffleArray(baseNotes));
+    } else {
+      setMappedNotes(baseNotes);
+    }
+  }, [getScaleNotes, isRandomMode]);
+
+
+  // Play Note Function
+  const playNote = (note, index) => {
+    if (!synthRef.current) return;
+    
+    // Add a slight random velocity for human feel
+    const velocity = 0.6 + Math.random() * 0.4;
+    synthRef.current.triggerAttackRelease(note, "8n", undefined, velocity);
+    
+    setActiveNote(index);
+    setTimeout(() => setActiveNote(null), 200);
+  };
+
+  // Backing Track Logic
+  const toggleBacking = () => {
+    if (isPlaying) {
+      Tone.Transport.stop();
+      Tone.Transport.cancel(); // Clear previous events
+      setIsPlaying(false);
+    } else {
+      Tone.Transport.bpm.value = 100; // Jazz Tempo
+      
+      const rootFreq = `${rootNote}2`;
+      const fifthFreq = `${NOTES[(NOTES.indexOf(rootNote) + 7) % 12]}2`;
+
+      // Simple Jazz Swing Beat
+      loopRef.current = new Tone.Loop((time) => {
+        // Walking Bass (Root on 1, Fifth on 3, randomized passing notes)
+        bassSynthRef.current.triggerAttackRelease(rootFreq, "4n", time);
+        bassSynthRef.current.triggerAttackRelease(fifthFreq, "4n", time + Tone.Time("2n"));
+
+        // Ride Cymbal Pattern (Ding, ding-a-ding)
+        hatSynthRef.current.triggerAttackRelease("16n", time, 0.4); // Beat 1
+        hatSynthRef.current.triggerAttackRelease("16n", time + Tone.Time("4n") + Tone.Time("8n") + Tone.Time("16n"), 0.3); // Swing upbeat
+        hatSynthRef.current.triggerAttackRelease("16n", time + Tone.Time("2n"), 0.4); // Beat 3
+        hatSynthRef.current.triggerAttackRelease("16n", time + Tone.Time("2n") + Tone.Time("4n") + Tone.Time("8n") + Tone.Time("16n"), 0.3); // Swing upbeat
+
+        // Soft Snare/Kick on 2 and 4
+        drumSynthRef.current.triggerAttackRelease("C1", "16n", time + Tone.Time("4n"), 0.5);
+        drumSynthRef.current.triggerAttackRelease("C1", "16n", time + Tone.Time("2n") + Tone.Time("4n"), 0.5);
+
+      }, "1m").start(0);
+
+      Tone.Transport.start();
+      setIsPlaying(true);
+    }
+  };
+
+  // Handle Volume Change
+  useEffect(() => {
+    if (synthRef.current) {
+      synthRef.current.volume.value = volume;
+    }
+  }, [volume]);
+
+  // Handle Keyboard Input
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!isStarted) return;
+      const keyIndex = KEY_MAPPING.indexOf(e.key.toLowerCase());
+      if (keyIndex !== -1 && keyIndex < mappedNotes.length) {
+        playNote(mappedNotes[keyIndex].note, keyIndex);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isStarted, mappedNotes]); // Depend on mappedNotes
+
+
+  // --- UI Render ---
+  
+  if (!isStarted) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen w-full bg-slate-950 text-white font-sans">
+        <div className="text-center space-y-6 max-w-lg px-6">
+          <div className="mb-4">
+            <Music size={64} className="mx-auto text-yellow-500 animate-bounce" />
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tighter bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+            Jazzy Touch
+          </h1>
+          <p className="text-slate-400 text-lg">
+            音楽理論は不要です。<br/>
+            画面の鍵盤を適当に叩くだけで、<br/>
+            本格的なジャズピアノ演奏が楽しめます。
+          </p>
+          <button 
+            onClick={initAudio}
+            className="group relative px-8 py-4 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-full transition-all shadow-lg hover:shadow-yellow-500/50"
+          >
+            Click to Start Jazz Session
+            <span className="absolute inset-0 rounded-full ring-2 ring-white ring-opacity-20 animate-ping"></span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-col h-screen w-full bg-gradient-to-b ${currentScale.color} text-white transition-colors duration-1000 overflow-hidden`}>
+      
+      {/* Header & Controls */}
+      <header className="flex-none p-4 md:p-6 backdrop-blur-md bg-black/30 border-b border-white/10">
+        <div className="max-w-6xl mx-auto flex flex-col xl:flex-row justify-between items-center gap-4">
+          
+          <div className="flex items-center gap-2 mb-2 xl:mb-0">
+            <Music className="text-yellow-500" />
+            <h1 className="text-2xl font-bold tracking-tight hidden md:block">Jazzy Touch</h1>
+          </div>
+
+          <div className="flex flex-wrap justify-center items-center gap-2 md:gap-4">
+            {/* Key Selector */}
+            <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10">
+              <span className="text-[10px] md:text-xs text-slate-400 uppercase font-bold">Key</span>
+              <select 
+                value={rootNote} 
+                onChange={(e) => setRootNote(e.target.value)}
+                className="bg-transparent font-mono font-bold outline-none cursor-pointer text-base md:text-lg"
+              >
+                {NOTES.map(n => <option key={n} value={n} className="bg-slate-900">{n}</option>)}
+              </select>
+            </div>
+
+            {/* Scale Selector */}
+            <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10">
+              <span className="text-[10px] md:text-xs text-slate-400 uppercase font-bold">Scale</span>
+              <select 
+                value={currentScaleKey} 
+                onChange={(e) => setCurrentScaleKey(e.target.value)}
+                className="bg-transparent font-bold outline-none cursor-pointer text-xs md:text-sm w-32 md:w-40"
+              >
+                {Object.keys(SCALES).map(k => (
+                  <option key={k} value={k} className="bg-slate-900">{SCALES[k].name}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Mode Selector (Linear / Random) */}
+            <button
+              onClick={() => setIsRandomMode(!isRandomMode)}
+              className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+              title={isRandomMode ? "Switch to Linear Mode" : "Switch to Random Mode"}
+            >
+              <span className="text-[10px] md:text-xs text-slate-400 uppercase font-bold hidden md:inline">Order</span>
+              {isRandomMode ? (
+                <div className="flex items-center gap-1 text-yellow-400">
+                  <Shuffle size={16} />
+                  <span className="text-xs font-bold">Random</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-blue-400">
+                  <ArrowUpRight size={16} />
+                  <span className="text-xs font-bold">Linear</span>
+                </div>
+              )}
+            </button>
+
+             {/* Volume Control */}
+             <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10 hidden md:flex">
+               <Volume2 size={16} className="text-slate-400"/>
+               <input 
+                 type="range" min="-30" max="0" step="1" 
+                 value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))}
+                 className="w-16 md:w-20 accent-yellow-500 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+               />
+             </div>
+          </div>
+
+          <button
+            onClick={toggleBacking}
+            className={`flex items-center gap-2 px-4 md:px-6 py-2 rounded-full font-bold transition-all text-sm md:text-base mt-2 xl:mt-0 ${
+              isPlaying 
+              ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30' 
+              : 'bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30'
+            }`}
+          >
+            {isPlaying ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+            {isPlaying ? 'Stop Backing' : 'Start Backing'}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col items-center justify-between p-4 md:p-8 max-w-6xl mx-auto w-full">
+        
+        {/* Info Card */}
+        <div className="w-full bg-black/40 backdrop-blur-sm border border-white/10 rounded-2xl p-4 md:p-8 shadow-2xl mb-4 transition-all duration-500">
+          <div className="flex items-start gap-4">
+            <div className={`p-3 rounded-full bg-white/5 ${currentScale.accent} hidden md:block`}>
+              <Info size={24} />
+            </div>
+            <div>
+              <h2 className="text-lg md:text-xl font-bold mb-1 flex items-center gap-2">
+                {currentScale.name}
+                <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-full border border-white/20 text-slate-300 font-normal bg-white/5">
+                  Famous In
+                </span>
+              </h2>
+              <div className="text-base md:text-2xl font-light mb-2 text-white">
+                🎵 {currentScale.info.song}
+              </div>
+              <p className={`text-xs md:text-sm opacity-90 ${currentScale.accent} mb-2`}>
+                Artists: {currentScale.info.artist}
+              </p>
+              <p className="text-xs md:text-sm text-slate-400 leading-relaxed max-w-2xl">
+                {currentScale.info.desc}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Visualizer / Mood Area (Empty space for now, but sets the vibe) */}
+        <div className="flex-1 w-full flex items-center justify-center min-h-[50px] md:min-h-[100px]">
+          {isPlaying && (
+            <div className="flex items-end gap-1 h-12">
+               {[...Array(20)].map((_, i) => (
+                 <div 
+                   key={i}
+                   className={`w-1 rounded-t-full bg-white/20 animate-pulse`}
+                   style={{
+                     height: `${Math.random() * 100}%`,
+                     animationDuration: `${0.2 + Math.random() * 0.5}s`
+                   }}
+                 ></div>
+               ))}
+            </div>
+          )}
+          {!isPlaying && <p className="text-white/20 text-sm italic">Press "Start Backing" for a rhythm section...</p>}
+        </div>
+
+        {/* The Magic Keyboard */}
+        <div className="w-full">
+          <div className="flex justify-between items-end mb-2 px-2">
+             <span className="text-[10px] md:text-xs text-slate-400 font-mono">KEYBOARD: [Z] [X] [C] [V] ...</span>
+             {isRandomMode && <span className="text-[10px] md:text-xs text-yellow-500 font-mono animate-pulse">MODE: RANDOM</span>}
+          </div>
+          
+          <div className="grid grid-cols-10 gap-1 md:gap-2 h-32 md:h-48 w-full p-2 bg-black/60 rounded-xl border border-white/10 shadow-inner">
+            {mappedNotes.slice(0, 10).map((noteObj, idx) => {
+              const isActive = activeNote === idx;
+              const isRoot = noteObj.isRoot;
+              const isBlue = noteObj.isBlue;
+              
+              // Dynamic Class Logic
+              let bgClass = "bg-white/5 hover:bg-white/10";
+              if (isActive) bgClass = "bg-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.6)] translate-y-1";
+              else if (isRoot) bgClass = "bg-white/20";
+              else if (isBlue) bgClass = "bg-blue-500/20";
+
+              let textClass = "text-slate-500";
+              if (isActive) textClass = "text-black font-bold";
+              else if (isRoot) textClass = "text-yellow-500 font-bold";
+              else if (isBlue) textClass = "text-blue-400";
+
+              return (
+                <button
+                  key={idx}
+                  onMouseDown={() => playNote(noteObj.note, idx)}
+                  className={`
+                    relative group flex flex-col items-center justify-end pb-4 rounded-lg 
+                    transition-all duration-75 ease-out border-b-4 border-black/50 active:border-b-0
+                    ${bgClass}
+                  `}
+                >
+                  {/* Visual Indicator for Key Mapping */}
+                  <span className="absolute top-2 left-2 text-[10px] opacity-30 font-mono uppercase">
+                    {KEY_MAPPING[idx]}
+                  </span>
+
+                  {/* Note Name */}
+                  <span className={`text-lg md:text-2xl select-none ${textClass}`}>
+                    {noteObj.label}
+                  </span>
+                  
+                  {isBlue && (
+                    <span className="absolute -top-2 -right-2 px-1.5 py-0.5 bg-blue-600 text-[9px] rounded text-white font-bold shadow-lg">
+                      BLUE
+                    </span>
+                  )}
+                  {isRoot && (
+                    <span className="absolute bottom-1 w-1 h-1 bg-yellow-500 rounded-full opacity-50"></span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-center text-[10px] md:text-xs text-slate-500 mt-4">
+            ※ 音が出ない場合は、一度画面をクリックしてから試してください。
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}
