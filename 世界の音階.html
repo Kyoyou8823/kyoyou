@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>世界の音階 聴き比べアプリ</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (for JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* カスタムスクロールバーなどの微調整 */
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        }
+        /* スクロールバーを隠す（オプション） */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ライブラリから必要な機能を展開
+        const { useState, useEffect, useRef } = React;
+
+        // アイコンコンポーネント (Lucide Reactの依存を排除し、インラインSVG化)
+        const Play = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+        );
+
+        const Music = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+        );
+
+        const Volume2 = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+        );
+
+        const Info = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+        );
+
+        const MusicalScalesApp = () => {
+            const [activeScale, setActiveScale] = useState('major');
+            const [waveform, setWaveform] = useState('triangle');
+            const [volume, setVolume] = useState(0.3);
+            const [playingNote, setPlayingNote] = useState(null);
+            const audioContextRef = useRef(null);
+
+            // 音階データ（基準音: C4 = 261.63Hz）
+            const scales = {
+                major: {
+                    id: 'major',
+                    name: '西洋 (ドレミ)',
+                    description: '学校で習う一般的な長音階（メジャースケール）。明るく安定した響きです。',
+                    color: 'bg-blue-500',
+                    notes: [
+                        { name: 'ド', pitch: 'C', freq: 261.63 },
+                        { name: 'レ', pitch: 'D', freq: 293.66 },
+                        { name: 'ミ', pitch: 'E', freq: 329.63 },
+                        { name: 'ファ', pitch: 'F', freq: 349.23 },
+                        { name: 'ソ', pitch: 'G', freq: 392.00 },
+                        { name: 'ラ', pitch: 'A', freq: 440.00 },
+                        { name: 'シ', pitch: 'B', freq: 493.88 },
+                        { name: 'ド(高)', pitch: 'C', freq: 523.25 },
+                    ]
+                },
+                okinawa: {
+                    id: 'okinawa',
+                    name: '沖縄 (琉球音階)',
+                    description: '「レ」と「ラ」を抜いた5音音階（ニロ抜き音階）。三線のような南国の響きが特徴。',
+                    color: 'bg-orange-500',
+                    notes: [
+                        { name: 'ド', pitch: 'C', freq: 261.63 },
+                        { name: 'ミ', pitch: 'E', freq: 329.63 },
+                        { name: 'ファ', pitch: 'F', freq: 349.23 },
+                        { name: 'ソ', pitch: 'G', freq: 392.00 },
+                        { name: 'シ', pitch: 'B', freq: 493.88 },
+                        { name: 'ド(高)', pitch: 'C', freq: 523.25 },
+                    ]
+                },
+                china: {
+                    id: 'china',
+                    name: '中国 (五声音階)',
+                    description: '「ファ」と「シ」を抜いた5音音階（ヨナ抜き音階）。民謡や東洋的な曲によく使われます。',
+                    color: 'bg-red-600',
+                    notes: [
+                        { name: '宮 (ド)', pitch: 'C', freq: 261.63 },
+                        { name: '商 (レ)', pitch: 'D', freq: 293.66 },
+                        { name: '角 (ミ)', pitch: 'E', freq: 329.63 },
+                        { name: '徴 (ソ)', pitch: 'G', freq: 392.00 },
+                        { name: '羽 (ラ)', pitch: 'A', freq: 440.00 },
+                        { name: '宮 (ド)', pitch: 'C', freq: 523.25 },
+                    ]
+                },
+                india: {
+                    id: 'india',
+                    name: 'インド (ラーガ)',
+                    description: '「ラーガ・バイラヴ」風の音階。第2音(レ)と第6音(ラ)が半音下がるのが特徴で、神秘的な響きです。',
+                    color: 'bg-purple-600',
+                    notes: [
+                        { name: 'Sa (ド)', pitch: 'C', freq: 261.63 },
+                        { name: 'Kom.Re', pitch: 'Db', freq: 277.18 },
+                        { name: 'Ga (ミ)', pitch: 'E', freq: 329.63 },
+                        { name: 'Ma (ファ)', pitch: 'F', freq: 349.23 },
+                        { name: 'Pa (ソ)', pitch: 'G', freq: 392.00 },
+                        { name: 'Kom.Dha', pitch: 'Ab', freq: 415.30 },
+                        { name: 'Ni (シ)', pitch: 'B', freq: 493.88 },
+                        { name: 'Sa (ド)', pitch: 'C', freq: 523.25 },
+                    ]
+                },
+                bluenote: {
+                    id: 'bluenote',
+                    name: 'ブルーノート',
+                    description: 'ジャズやブルースで使われる音階。ミ・ソ・シが半音下がった独特の哀愁や渋さがあります。',
+                    color: 'bg-indigo-900',
+                    notes: [
+                        { name: 'ド', pitch: 'C', freq: 261.63 },
+                        { name: 'ミ♭', pitch: 'Eb', freq: 311.13 },
+                        { name: 'ファ', pitch: 'F', freq: 349.23 },
+                        { name: 'ソ♭', pitch: 'Gb', freq: 369.99 },
+                        { name: 'ソ', pitch: 'G', freq: 392.00 },
+                        { name: 'シ♭', pitch: 'Bb', freq: 466.16 },
+                        { name: 'ド(高)', pitch: 'C', freq: 523.25 },
+                    ]
+                }
+            };
+
+            // AudioContextの初期化
+            const initAudioContext = () => {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!audioContextRef.current) {
+                    audioContextRef.current = new AudioContext();
+                }
+                if (audioContextRef.current.state === 'suspended') {
+                    audioContextRef.current.resume();
+                }
+            };
+
+            // 音を再生する関数
+            const playTone = (freq, duration = 0.5) => {
+                initAudioContext();
+                const ctx = audioContextRef.current;
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+
+                osc.type = waveform;
+                osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+                // エンベロープ（音の出だしと消え際）の設定
+                const now = ctx.currentTime;
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(volume, now + 0.05); // Attack
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration); // Decay
+
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + duration);
+            };
+
+            // スケール全体を順番に再生
+            const playFullScale = async () => {
+                const notes = scales[activeScale].notes;
+                const duration = 500; // ms
+
+                for (let i = 0; i < notes.length; i++) {
+                    setPlayingNote(i);
+                    playTone(notes[i].freq, 0.6);
+                    await new Promise(r => setTimeout(r, duration));
+                }
+                setPlayingNote(null);
+            };
+
+            const handleNoteClick = (note, index) => {
+                setPlayingNote(index);
+                playTone(note.freq, 0.8);
+                setTimeout(() => setPlayingNote(null), 300);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 text-gray-800 font-sans p-4 md:p-8">
+                    <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+                        
+                        {/* Header */}
+                        <div className="bg-slate-800 text-white p-6">
+                            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
+                                <Music className="w-8 h-8 text-yellow-400" />
+                                世界の音階 聴き比べ
+                            </h1>
+                            <p className="text-slate-300 mt-2 text-sm md:text-base">
+                                それぞれの文化やジャンルを象徴する「音の並び」を体験しよう。
+                            </p>
+                        </div>
+
+                        {/* Controls */}
+                        <div className="p-6 border-b bg-gray-50 flex flex-wrap gap-6 justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-600">
+                                    <Volume2 className="w-5 h-5" />
+                                    音量
+                                    <input 
+                                        type="range" 
+                                        min="0" max="0.5" step="0.01" 
+                                        value={volume}
+                                        onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                        className="w-24 md:w-32 accent-slate-600"
+                                    />
+                                </label>
+                                
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-gray-600">音色:</span>
+                                    <select 
+                                        value={waveform} 
+                                        onChange={(e) => setWaveform(e.target.value)}
+                                        className="border rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                                    >
+                                        <option value="triangle">フルート風 (Triangle)</option>
+                                        <option value="sine">優しい (Sine)</option>
+                                        <option value="square">ゲーム風 (Square)</option>
+                                        <option value="sawtooth">バイオリン風 (Sawtooth)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row">
+                            {/* Scale Selector (Sidebar on Desktop, Top on Mobile) */}
+                            <div className="md:w-1/4 bg-slate-100 p-2 md:p-4 flex flex-row md:flex-col overflow-x-auto md:overflow-visible gap-2 no-scrollbar">
+                                {Object.values(scales).map((scale) => (
+                                    <button
+                                        key={scale.id}
+                                        onClick={() => setActiveScale(scale.id)}
+                                        className={`flex-shrink-0 md:w-full text-left px-4 py-3 rounded-lg transition-all duration-200 font-medium text-sm md:text-base whitespace-nowrap md:whitespace-normal ${
+                                            activeScale === scale.id 
+                                                ? `${scale.color} text-white shadow-md transform scale-105` 
+                                                : 'bg-white text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {scale.name}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Main Content Area */}
+                            <div className="flex-1 p-6 md:p-8">
+                                <div className="mb-6">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                                        <h2 className={`text-2xl font-bold ${scales[activeScale].color.replace('bg-', 'text-')}`}>
+                                            {scales[activeScale].name}
+                                        </h2>
+                                        <button 
+                                            onClick={playFullScale}
+                                            className="sm:ml-auto w-full sm:w-auto flex justify-center items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors shadow-lg active:transform active:scale-95"
+                                        >
+                                            <Play className="w-4 h-4" /> 全音再生
+                                        </button>
+                                    </div>
+                                    <p className="text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100 flex items-start gap-2 text-sm">
+                                        <Info className="w-5 h-5 flex-shrink-0 mt-0.5 text-gray-400" />
+                                        {scales[activeScale].description}
+                                    </p>
+                                </div>
+
+                                {/* Keyboard / Note Buttons */}
+                                <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-4">
+                                    {scales[activeScale].notes.map((note, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => handleNoteClick(note, index)}
+                                            className={`
+                                                relative h-24 md:h-48 rounded-xl flex flex-col items-center justify-end p-2 md:p-4 transition-all duration-100 shadow-sm border-2 border-gray-100
+                                                ${playingNote === index 
+                                                    ? `${scales[activeScale].color} text-white scale-95 ring-4 ring-opacity-30 ring-current` 
+                                                    : 'bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-800'
+                                                }
+                                            `}
+                                        >
+                                            <div className="mb-auto mt-2 md:mt-4 text-[10px] md:text-xs font-mono text-gray-400 opacity-50">
+                                                {note.pitch}
+                                            </div>
+                                            <div className={`text-base md:text-xl font-bold ${playingNote === index ? 'text-white' : 'text-gray-700'}`}>
+                                                {note.name}
+                                            </div>
+                                            {playingNote === index && (
+                                                <div className="absolute inset-0 rounded-xl bg-white opacity-20 animate-pulse"></div>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div className="mt-8 text-center text-xs md:text-sm text-gray-400">
+                                    ボタンをタップ、または「全音再生」で音階を確認
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MusicalScalesApp />);
+    </script>
+</body>
+</html>
