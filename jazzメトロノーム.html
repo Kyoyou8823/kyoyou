@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jazz Swing Metronome</title>
+    <meta name="description" content="スウィング感とジャズのリズム（2 & 4）を練習できる高機能Webメトロノーム。">
+    
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e5e5e5;
+            touch-action: manipulation; /* スマホでの操作性向上 */
+            -webkit-user-select: none; /* テキスト選択防止 */
+            user-select: none;
+        }
+
+        /* カスタムスライダー */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #f59e0b; /* Amber-500 */
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #4b5563;
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        /* トグルスイッチ */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #f59e0b;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #f59e0b;
+        }
+
+        /* インジケーター */
+        .beat-indicator {
+            transition: background-color 0.05s, transform 0.05s;
+        }
+        .active-beat {
+            background-color: #fbbf24 !important;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px #fbbf24;
+        }
+        .accent-beat {
+            background-color: #ef4444 !important;
+            transform: scale(1.2);
+            box-shadow: 0 0 20px #ef4444;
+        }
+        .sub-beat {
+            background-color: #71717a !important; /* Zinc-500 */
+            transform: scale(0.8);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md bg-zinc-800 rounded-2xl shadow-2xl overflow-hidden border border-zinc-700">
+        <!-- ヘッダー -->
+        <div class="bg-zinc-900 p-6 text-center border-b border-zinc-700">
+            <h1 class="text-2xl font-bold text-amber-500 tracking-wider">SWING METRONOME</h1>
+            <p class="text-zinc-500 text-xs mt-1 uppercase tracking-widest">Jazz & Rhythm Trainer</p>
+        </div>
+
+        <!-- メインコントロール -->
+        <div class="p-6 space-y-8">
+            
+            <!-- テンポ -->
+            <div class="text-center">
+                <div class="flex items-center justify-center space-x-4 mb-2">
+                    <button id="btn-decrease" class="w-10 h-10 rounded-full bg-zinc-700 hover:bg-zinc-600 text-white font-bold transition flex items-center justify-center shadow-lg active:scale-95" aria-label="Decrease Tempo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                    
+                    <div class="flex flex-col items-center w-32">
+                        <span id="tempo-display" class="text-6xl font-bold text-white tabular-nums">120</span>
+                        <span class="text-zinc-400 text-sm font-semibold">BPM</span>
+                    </div>
+
+                    <button id="btn-increase" class="w-10 h-10 rounded-full bg-zinc-700 hover:bg-zinc-600 text-white font-bold transition flex items-center justify-center shadow-lg active:scale-95" aria-label="Increase Tempo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                </div>
+                
+                <input type="range" id="tempo-slider" min="30" max="250" value="120" class="w-full mt-4" aria-label="Tempo Slider">
+                
+                <div class="mt-4">
+                     <button id="tap-btn" class="px-6 py-2 bg-zinc-700 rounded-full text-sm font-semibold text-zinc-300 hover:bg-zinc-600 hover:text-white transition active:scale-95 border border-zinc-600 shadow-inner">
+                        TAP TEMPO
+                    </button>
+                </div>
+            </div>
+
+            <!-- ビジュアライザー -->
+            <div class="flex justify-between px-4 py-4 bg-zinc-900/50 rounded-xl border border-zinc-700/50" id="visualizer">
+                <div class="w-4 h-4 rounded-full bg-zinc-700 beat-indicator" id="beat-1"></div>
+                <div class="w-2 h-2 rounded-full bg-zinc-800 beat-indicator opacity-50" id="sub-beat-1"></div>
+                <div class="w-4 h-4 rounded-full bg-zinc-700 beat-indicator" id="beat-2"></div>
+                <div class="w-2 h-2 rounded-full bg-zinc-800 beat-indicator opacity-50" id="sub-beat-2"></div>
+                <div class="w-4 h-4 rounded-full bg-zinc-700 beat-indicator" id="beat-3"></div>
+                <div class="w-2 h-2 rounded-full bg-zinc-800 beat-indicator opacity-50" id="sub-beat-3"></div>
+                <div class="w-4 h-4 rounded-full bg-zinc-700 beat-indicator" id="beat-4"></div>
+                <div class="w-2 h-2 rounded-full bg-zinc-800 beat-indicator opacity-50" id="sub-beat-4"></div>
+            </div>
+
+            <!-- 設定エリア -->
+            <div class="space-y-6">
+                
+                <!-- リズムモード -->
+                <div class="flex flex-col space-y-2">
+                    <label class="text-xs text-zinc-400 font-bold uppercase tracking-wider">リズムパターン (Accent)</label>
+                    <div class="grid grid-cols-3 gap-2 bg-zinc-900 p-1 rounded-lg">
+                        <button class="mode-btn active px-3 py-2 text-xs font-semibold rounded-md bg-amber-600 text-white transition" data-mode="standard">Standard<br><span class="opacity-70 font-normal">1 & 3</span></button>
+                        <button class="mode-btn px-3 py-2 text-xs font-semibold rounded-md text-zinc-400 hover:text-white transition" data-mode="jazz">Jazz<br><span class="opacity-70 font-normal">2 & 4</span></button>
+                        <button class="mode-btn px-3 py-2 text-xs font-semibold rounded-md text-zinc-400 hover:text-white transition" data-mode="flat">Flat<br><span class="opacity-70 font-normal">None</span></button>
+                    </div>
+                </div>
+
+                <!-- 8分音符トグル -->
+                <div class="flex items-center justify-between bg-zinc-900 p-3 rounded-lg border border-zinc-700/50">
+                    <div class="flex flex-col">
+                        <span class="text-sm font-bold text-white">8分音符を鳴らす</span>
+                        <span class="text-xs text-zinc-500">裏拍 (Subdivision)</span>
+                    </div>
+                    <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="eighth-note-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300 left-0 checked:left-6"/>
+                        <label for="eighth-note-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-zinc-700 cursor-pointer transition-colors duration-300"></label>
+                    </div>
+                </div>
+
+                <!-- スウィング調整 -->
+                <div class="flex flex-col space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs text-zinc-400 font-bold uppercase tracking-wider">スウィング感 (Swing)</label>
+                        <span id="swing-value" class="text-xs text-amber-500 font-bold">0%</span>
+                    </div>
+                    <input type="range" id="swing-slider" min="0" max="66" value="0" class="w-full" aria-label="Swing Slider">
+                    <div class="flex justify-between text-[10px] text-zinc-500">
+                        <span>Straight (0%)</span>
+                        <span>Triplet (66%)</span>
+                    </div>
+                    <p class="text-[10px] text-zinc-500 pt-1 text-center">※ 8分音符をONにすると違いがよく分かります</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 再生ボタン -->
+        <div class="p-6 bg-zinc-900 border-t border-zinc-700">
+            <button id="play-btn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold text-lg shadow-lg hover:shadow-orange-500/30 hover:scale-[1.02] active:scale-[0.98] transition flex items-center justify-center space-x-2">
+                <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <svg id="pause-icon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                <span id="play-text">START</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context & Timer Logic ---
+        // Web Audio APIのコンテキスト
+        let audioContext = null;
+        let isPlaying = false;
+        let current16thNote = 0; // 0-7 (8分音符カウント)
+        let tempo = 120.0;
+        let lookahead = 25.0; // スケジューリング関数の呼び出し頻度(ms)
+        let scheduleAheadTime = 0.1; // 先読み時間(sec)
+        let nextNoteTime = 0.0;
+        let timerID = 0;
+        
+        // Settings
+        let swingPercentage = 0; // 0 ~ 66 (approx)
+        let rhythmMode = 'standard'; // 'standard', 'jazz', 'flat'
+        let play8thNotes = false; // 裏拍を鳴らすかどうかのフラグ
+        
+        // Tap Tempo Logic
+        let tapTimes = [];
+        const TAP_TIMEOUT = 2000;
+
+        // UI Elements
+        const playBtn = document.getElementById('play-btn');
+        const playText = document.getElementById('play-text');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const tempoDisplay = document.getElementById('tempo-display');
+        const tempoSlider = document.getElementById('tempo-slider');
+        const btnIncrease = document.getElementById('btn-increase');
+        const btnDecrease = document.getElementById('btn-decrease');
+        const tapBtn = document.getElementById('tap-btn');
+        const swingSlider = document.getElementById('swing-slider');
+        const swingValue = document.getElementById('swing-value');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const eighthNoteToggle = document.getElementById('eighth-note-toggle');
+        
+        // Visualizers
+        const beatIndicators = [
+            document.getElementById('beat-1'),
+            document.getElementById('beat-2'),
+            document.getElementById('beat-3'),
+            document.getElementById('beat-4')
+        ];
+        const subBeatIndicators = [
+            document.getElementById('sub-beat-1'),
+            document.getElementById('sub-beat-2'),
+            document.getElementById('sub-beat-3'),
+            document.getElementById('sub-beat-4')
+        ];
+
+        // --- Sound Synthesis ---
+
+        function playSound(time, isAccent, isOffBeat) {
+            // 音の発振器を作成
+            const osc = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            osc.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            if (isOffBeat) {
+                // 裏拍の音: 小さく、短く、少し高め
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(rhythmMode === 'jazz' ? 1000 : 1200, time); 
+                
+                const vol = rhythmMode === 'jazz' ? 0.15 : 0.2;
+                gainNode.gain.setValueAtTime(vol, time);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.03);
+                
+                osc.start(time);
+                osc.stop(time + 0.05);
+                return;
+            }
+
+            // 表拍の音
+            if (rhythmMode === 'jazz') {
+                if (isAccent) { // 2 & 4拍目
+                    // Hi-hat / Chick sound
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, time);
+                    osc.frequency.exponentialRampToValueAtTime(100, time + 0.05);
+                    gainNode.gain.setValueAtTime(0.7, time);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+                } else { // 1 & 3拍目
+                    // Subtle
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, time);
+                    gainNode.gain.setValueAtTime(0.3, time);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.03);
+                }
+            } else if (rhythmMode === 'standard') {
+                osc.type = isAccent ? 'triangle' : 'sine';
+                osc.frequency.value = isAccent ? 1200 : 800;
+                gainNode.gain.setValueAtTime(isAccent ? 0.8 : 0.5, time);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+            } else {
+                // Flat
+                osc.type = 'sine';
+                osc.frequency.value = 1000;
+                gainNode.gain.setValueAtTime(0.5, time);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+            }
+
+            osc.start(time);
+            osc.stop(time + 0.1);
+        }
+
+        // --- Scheduling Logic ---
+
+        function nextNote() {
+            const secondsPerBeat = 60.0 / tempo;
+            const eighthNoteTime = secondsPerBeat * 0.5;
+            // Swing factor: 0.0 - 0.66
+            const swingFactor = (swingPercentage / 100); 
+
+            let duration;
+            
+            // current16thNote: 偶数=表, 奇数=裏
+            if (current16thNote % 2 === 0) {
+                // 表拍の長さ (長くなる)
+                duration = eighthNoteTime * (1 + swingFactor);
+            } else {
+                // 裏拍の長さ (短くなる)
+                duration = eighthNoteTime * (1 - swingFactor);
+            }
+
+            nextNoteTime += duration;
+
+            current16thNote++;
+            if (current16thNote == 8) { 
+                current16thNote = 0;
+            }
+        }
+
+        function scheduleNote(beatNumber, time) {
+            // UI更新のスケジュール
+            const drawTime = (time - audioContext.currentTime) * 1000;
+            if (drawTime > 0) {
+                setTimeout(() => {
+                    updateVisuals(beatNumber);
+                }, drawTime);
+            }
+
+            // 音の再生ロジック
+            const isOffBeat = (beatNumber % 2 !== 0);
+            
+            // 裏拍の音出し判定
+            if (isOffBeat && !play8thNotes) {
+                return; 
+            }
+
+            const quarterNoteIndex = Math.floor(beatNumber / 2); // 0, 1, 2, 3
+            let isAccent = false;
+
+            if (!isOffBeat) {
+                if (rhythmMode === 'standard') {
+                    isAccent = (quarterNoteIndex === 0);
+                } else if (rhythmMode === 'jazz') {
+                    isAccent = (quarterNoteIndex === 1 || quarterNoteIndex === 3);
+                }
+            }
+            
+            playSound(time, isAccent, isOffBeat);
+        }
+
+        function scheduler() {
+            // 先読み時間内にある音符をすべてスケジュールする
+            while (nextNoteTime < audioContext.currentTime + scheduleAheadTime) {
+                scheduleNote(current16thNote, nextNoteTime);
+                nextNote();
+            }
+            timerID = window.setTimeout(scheduler, lookahead);
+        }
+
+        function updateVisuals(beatNumber) {
+            // 全てリセット
+            beatIndicators.forEach(el => el.className = 'w-4 h-4 rounded-full bg-zinc-700 beat-indicator');
+            subBeatIndicators.forEach(el => el.className = 'w-2 h-2 rounded-full bg-zinc-800 beat-indicator opacity-50');
+
+            const isOffBeat = (beatNumber % 2 !== 0);
+            const index = Math.floor(beatNumber / 2);
+
+            if (!isOffBeat) {
+                // 表拍の点灯
+                const el = beatIndicators[index];
+                let activeClass = 'active-beat';
+                if (rhythmMode === 'standard' && index === 0) activeClass = 'accent-beat';
+                if (rhythmMode === 'jazz' && (index === 1 || index === 3)) activeClass = 'accent-beat';
+                el.className = `w-4 h-4 rounded-full beat-indicator ${activeClass}`;
+            } else {
+                // 裏拍の点灯
+                const el = subBeatIndicators[index];
+                el.className = `w-2 h-2 rounded-full beat-indicator sub-beat`;
+            }
+        }
+
+        // --- Controls ---
+
+        function startMetronome() {
+            if (audioContext == null) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // モバイル対策：サスペンド状態からの復帰
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            isPlaying = !isPlaying;
+
+            if (isPlaying) {
+                current16thNote = 0;
+                nextNoteTime = audioContext.currentTime + 0.05;
+                scheduler();
+                playText.textContent = "STOP";
+                playBtn.classList.remove('from-amber-500', 'to-orange-600');
+                playBtn.classList.add('from-red-500', 'to-red-600', 'shadow-red-500/30');
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+            } else {
+                window.clearTimeout(timerID);
+                playText.textContent = "START";
+                playBtn.classList.add('from-amber-500', 'to-orange-600');
+                playBtn.classList.remove('from-red-500', 'to-red-600', 'shadow-red-500/30');
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                
+                // Reset visuals
+                beatIndicators.forEach(el => el.className = 'w-4 h-4 rounded-full bg-zinc-700 beat-indicator');
+                subBeatIndicators.forEach(el => el.className = 'w-2 h-2 rounded-full bg-zinc-800 beat-indicator opacity-50');
+            }
+        }
+
+        playBtn.addEventListener('click', startMetronome);
+
+        // Tempo Control
+        function updateTempo(val) {
+            tempo = parseInt(val);
+            if (tempo < 30) tempo = 30;
+            if (tempo > 250) tempo = 250;
+            tempoDisplay.textContent = tempo;
+            tempoSlider.value = tempo;
+        }
+
+        tempoSlider.addEventListener('input', (e) => updateTempo(e.target.value));
+        btnIncrease.addEventListener('click', () => updateTempo(tempo + 1));
+        btnDecrease.addEventListener('click', () => updateTempo(tempo - 1));
+
+        // Tap Tempo
+        tapBtn.addEventListener('click', () => {
+            const now = Date.now();
+            if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > TAP_TIMEOUT) {
+                tapTimes = [];
+            }
+            tapTimes.push(now);
+            if (tapTimes.length >= 2) {
+                if (tapTimes.length > 4) tapTimes.shift();
+                let intervals = [];
+                for (let i = 1; i < tapTimes.length; i++) {
+                    intervals.push(tapTimes[i] - tapTimes[i-1]);
+                }
+                const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+                updateTempo(Math.round(60000 / avgInterval));
+                tapBtn.classList.add('bg-amber-600', 'text-white');
+                setTimeout(() => tapBtn.classList.remove('bg-amber-600', 'text-white'), 100);
+            }
+        });
+
+        // Rhythm Modes
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                modeBtns.forEach(b => {
+                    b.classList.remove('active', 'bg-amber-600', 'text-white');
+                    b.classList.add('text-zinc-400');
+                });
+                btn.classList.add('active', 'bg-amber-600', 'text-white');
+                btn.classList.remove('text-zinc-400');
+                rhythmMode = btn.dataset.mode;
+            });
+        });
+
+        // Swing Slider
+        swingSlider.addEventListener('input', (e) => {
+            swingPercentage = parseInt(e.target.value);
+            swingValue.textContent = `${swingPercentage}%`;
+        });
+
+        // 8th Note Toggle
+        eighthNoteToggle.addEventListener('change', (e) => {
+            play8thNotes = e.target.checked;
+        });
+
+        // Key Controls
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                startMetronome();
+            }
+        });
+
+    </script>
+</body>
+</html>
