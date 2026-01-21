@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ボックス 水 - ドリンクバールーレット</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #e0f2fe;
+            overflow-x: hidden;
+        }
+
+        /* 背景の泡アニメーション */
+        .bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: float 8s infinite ease-in-out;
+            z-index: -1;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            50% { opacity: 0.8; }
+            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+        }
+
+        /* ルーレット回転時のブラー効果 */
+        .blur-spin {
+            filter: blur(2px);
+            transition: filter 0.1s;
+        }
+
+        /* 決定時のポップアニメーション */
+        .pop-in {
+            animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // アイコンコンポーネント定義 (Lucide依存を排除し、SVGを直接記述してエラーを回避)
+        const GlassWater = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M15.2 22H8.8a2 2 0 0 1-2-1.79L5 3h14l-1.81 17.21A2 2 0 0 1 15.2 22Z" />
+                <path d="M6 12h12" />
+            </svg>
+        );
+
+        const Shuffle = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M21 16v5h-5" />
+                <path d="M21 3v5h-5" />
+                <path d="M3 21l8-8" />
+                <path d="M3 3l18 18" />
+            </svg>
+        );
+
+        const History = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M12 7v5l4 2" />
+            </svg>
+        );
+
+        const CupSoda = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="m7 7 1.75 12.25a2.75 2.75 0 0 0 2.75 2.75h5.5a2.75 2.75 0 0 0 2.75-2.75L21.5 7" />
+                <path d="M5 7h16" />
+                <path d="M12 5V2" />
+                <path d="m14 7-2-5" />
+            </svg>
+        );
+
+        // ドリンクのリスト
+        const DRINK_LIST = [
+            { name: "コーラ", color: "text-red-600", icon: "🥤" },
+            { name: "メロンソーダ", color: "text-green-500", icon: "🍈" },
+            { name: "オレンジジュース", color: "text-orange-500", icon: "🍊" },
+            { name: "ジンジャーエール", color: "text-yellow-600", icon: "🥃" },
+            { name: "アイスコーヒー", color: "text-amber-900", icon: "☕" },
+            { name: "ウーロン茶", color: "text-amber-700", icon: "🍵" },
+            { name: "カルピス", color: "text-blue-400", icon: "⚪" },
+            { name: "レモンスカッシュ", color: "text-yellow-400", icon: "🍋" },
+            { name: "アイスティー", color: "text-red-400", icon: "🫖" },
+            { name: "野菜ジュース", color: "text-orange-600", icon: "🥕" },
+            { name: "炭酸水", color: "text-cyan-400", icon: "🫧" },
+            { name: "水", color: "text-blue-500", icon: "💧" },
+            { name: "ホワイトウォーター", color: "text-blue-300", icon: "⬜" },
+            { name: "ミックスジュース", color: "text-pink-400", icon: "🍹" }
+        ];
+
+        const App = () => {
+            const [currentDrink, setCurrentDrink] = useState({ name: "???", color: "text-gray-400", icon: "❓" });
+            const [isSpinning, setIsSpinning] = useState(false);
+            const [history, setHistory] = useState([]);
+            const [message, setMessage] = useState("ボタンを押してドリンクを決めよう！");
+            
+            // 背景の泡を生成
+            useEffect(() => {
+                const createBubble = () => {
+                    const bubble = document.createElement('div');
+                    bubble.classList.add('bubble');
+                    const size = Math.random() * 60 + 20;
+                    bubble.style.width = `${size}px`;
+                    bubble.style.height = `${size}px`;
+                    bubble.style.left = `${Math.random() * 100}vw`;
+                    bubble.style.animationDuration = `${Math.random() * 5 + 5}s`;
+                    document.body.appendChild(bubble);
+
+                    setTimeout(() => {
+                        bubble.remove();
+                    }, 10000);
+                };
+
+                const interval = setInterval(createBubble, 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // ルーレットロジック
+            const startRoulette = () => {
+                if (isSpinning) return;
+                
+                setIsSpinning(true);
+                setMessage("抽選中...");
+                
+                let speed = 50; // 初期速度 (ms)
+                let counter = 0;
+                const minSpins = 20; // 最低回転数
+                const randomExtraSpins = Math.floor(Math.random() * 15); // ランダム追加回転
+                const totalSpins = minSpins + randomExtraSpins;
+
+                const spinLoop = () => {
+                    // ランダムにドリンクを表示
+                    const randomIndex = Math.floor(Math.random() * DRINK_LIST.length);
+                    const selected = DRINK_LIST[randomIndex];
+                    setCurrentDrink(selected);
+                    
+                    counter++;
+
+                    if (counter < totalSpins) {
+                        // 終盤にかけて少しずつ遅くする
+                        if (counter > totalSpins - 8) {
+                            speed *= 1.2;
+                        }
+                        setTimeout(spinLoop, speed);
+                    } else {
+                        // 決定
+                        finishSpin(selected);
+                    }
+                };
+
+                spinLoop();
+            };
+
+            const finishSpin = (selected) => {
+                setIsSpinning(false);
+                setMessage(`「${selected.name}」に決定！`);
+                setHistory(prev => [selected, ...prev].slice(0, 5)); // 最新5件を保存
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-4 relative z-10">
+                    
+                    {/* ヘッダーロゴ */}
+                    <header className="mb-8 text-center bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-blue-100">
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                            <div className="bg-blue-500 p-2 rounded-lg text-white">
+                                <GlassWater size={32} />
+                            </div>
+                            <h1 className="text-3xl font-bold text-blue-900 tracking-wider">ボックス 水</h1>
+                        </div>
+                        <p className="text-blue-500 text-sm font-bold">DRINK BAR ROULETTE</p>
+                    </header>
+
+                    {/* メインボックス */}
+                    <main className="w-full max-w-md">
+                        <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border-4 border-blue-200 text-center transform transition-all">
+                            
+                            {/* 結果表示エリア */}
+                            <div className="mb-8 relative">
+                                <div className="absolute top-0 left-0 w-full h-full bg-blue-50 rounded-2xl opacity-50 z-0"></div>
+                                <div className={`relative z-10 py-12 px-4 rounded-2xl border-2 border-blue-100 bg-gradient-to-b from-white to-blue-50 ${isSpinning ? 'blur-spin' : 'pop-in'}`}>
+                                    <div className="text-6xl mb-4 animate-bounce-slow">
+                                        {currentDrink.icon}
+                                    </div>
+                                    <h2 className={`text-4xl font-bold break-words leading-tight ${currentDrink.color}`}>
+                                        {currentDrink.name}
+                                    </h2>
+                                </div>
+                            </div>
+
+                            {/* メッセージ */}
+                            <p className="text-slate-500 mb-6 font-medium h-6">
+                                {message}
+                            </p>
+
+                            {/* アクションボタン */}
+                            <button
+                                onClick={startRoulette}
+                                disabled={isSpinning}
+                                className={`
+                                    w-full py-5 rounded-xl text-xl font-bold shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-3
+                                    ${isSpinning 
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                        : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-cyan-200/50 hover:-translate-y-1'
+                                    }
+                                `}
+                            >
+                                {isSpinning ? (
+                                    <>
+                                        <Shuffle className="animate-spin" />
+                                        選んでいます...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CupSoda />
+                                        ドリンクを決める！
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* 履歴エリア */}
+                        {history.length > 0 && (
+                            <div className="mt-8 bg-white/60 backdrop-blur-md rounded-2xl p-4 shadow-md">
+                                <div className="flex items-center gap-2 mb-3 text-blue-800 px-2">
+                                    <History size={18} />
+                                    <span className="font-bold text-sm">これまでのドリンク</span>
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto pb-2 px-1 scrollbar-hide">
+                                    {history.map((drink, index) => (
+                                        <div key={index} className="flex-shrink-0 bg-white p-3 rounded-xl shadow-sm border border-blue-50 flex flex-col items-center w-24">
+                                            <span className="text-2xl mb-1">{drink.icon}</span>
+                                            <span className="text-xs font-bold text-gray-600 truncate w-full text-center">{drink.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* フッター */}
+                    <footer className="mt-12 text-blue-900/40 text-xs font-bold">
+                        © Box Water Roulette
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
