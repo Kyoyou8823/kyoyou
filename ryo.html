@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>勉強すごろく - Study Tycoon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f0f4f8;
+            touch-action: manipulation; /* スマホでのダブルタップ拡大防止 */
+        }
+        
+        /* すごろくの盤面グリッド */
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .cell:active {
+            transform: scale(0.95);
+        }
+
+        /* マスの種類ごとの色 */
+        .cell-start { background-color: #fbbf24; color: #78350f; border-color: #d97706; }
+        .cell-good { background-color: #86efac; color: #14532d; }
+        .cell-bad { background-color: #fca5a5; color: #7f1d1d; }
+        .cell-event { background-color: #93c5fd; color: #1e3a8a; }
+        .cell-company { background-color: #d8b4fe; color: #581c87; }
+
+        /* プレイヤーのコマ */
+        .player-token {
+            position: absolute;
+            width: 70%;
+            height: 70%;
+            background-color: #ef4444;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 10;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        /* 会社ビルの進化アニメーション */
+        .building-container {
+            transition: all 0.5s;
+        }
+        .building-icon {
+            font-size: 4rem;
+            transition: all 0.5s;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.2));
+        }
+
+        /* タイマーのアニメーション */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+        .timer-active .timer-dot {
+            animation: pulse-ring 1.5s infinite;
+        }
+
+        /* サイコロのアニメーション */
+        @keyframes roll {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(90deg); }
+            50% { transform: rotate(180deg); }
+            75% { transform: rotate(270deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .dice-rolling {
+            animation: roll 0.2s linear infinite;
+        }
+
+        /* モーダル */
+        .modal {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* プログレスバー */
+        .progress-bar-fill {
+            transition: width 0.5s ease-out;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden text-gray-800">
+
+    <!-- ヘッダー情報 -->
+    <header class="bg-white shadow-md p-3 z-20 flex justify-between items-center shrink-0">
+        <div>
+            <h1 class="font-bold text-lg text-indigo-600"><i class="fas fa-building mr-2"></i>勉強すごろく</h1>
+            <p class="text-xs text-gray-500">レベル <span id="company-level-display">1</span>: <span id="company-name-display">ガレージ創業</span></p>
+        </div>
+        <div class="text-right">
+            <div class="font-bold text-green-600">¥ <span id="money-display">0</span></div>
+            <div class="text-sm font-bold text-orange-500"><i class="fas fa-dice mr-1"></i>残り: <span id="dice-count-display">0</span>個</div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツエリア -->
+    <main class="flex-1 overflow-y-auto bg-gray-100 flex flex-col relative">
+        
+        <!-- 会社ビジュアル部分 -->
+        <div class="bg-gradient-to-b from-indigo-500 to-indigo-700 p-6 text-white text-center shrink-0 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-full opacity-10">
+                <i class="fas fa-chart-line absolute top-10 left-10 text-6xl"></i>
+                <i class="fas fa-code absolute bottom-5 right-10 text-6xl"></i>
+            </div>
+            
+            <div class="building-container relative z-10 mb-2">
+                <i id="building-icon" class="fas fa-warehouse building-icon text-yellow-300"></i>
+            </div>
+            <h2 id="company-title" class="text-xl font-bold mb-1">ガレージ創業</h2>
+            <p id="next-level-text" class="text-xs opacity-80 mb-2">次のレベルまで: ¥1,000,000</p>
+            
+            <!-- 経験値バー -->
+            <div class="w-full max-w-xs mx-auto bg-indigo-900 rounded-full h-2.5 mb-4">
+                <div id="level-progress" class="bg-yellow-400 h-2.5 rounded-full progress-bar-fill" style="width: 0%"></div>
+            </div>
+
+            <!-- 勉強タイマーボタン -->
+            <button id="timer-btn" onclick="toggleTimer()" class="bg-white text-indigo-600 hover:bg-gray-100 font-bold py-3 px-8 rounded-full shadow-lg transform transition active:scale-95 flex items-center justify-center mx-auto min-w-[200px]">
+                <span id="timer-status-icon" class="mr-2"><i class="fas fa-play"></i></span>
+                <span id="timer-text">勉強を開始</span>
+            </button>
+            <p id="timer-display" class="text-3xl font-mono mt-2 hidden">00:00:00</p>
+            <p class="text-xs mt-1 opacity-75">5分勉強 = サイコロ1個 + 資金</p>
+        </div>
+
+        <!-- すごろくボードエリア -->
+        <div class="flex-1 p-4 flex flex-col items-center justify-center bg-gray-50">
+            <div class="w-full max-w-md">
+                <div id="board" class="board-grid">
+                    <!-- JavaScriptでセルを生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- アクションボタン -->
+        <div class="p-4 bg-white border-t border-gray-200 flex justify-center gap-4 shrink-0 shadow-lg z-20">
+            <button onclick="rollDice()" id="roll-btn" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transform transition active:scale-95 w-full max-w-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="fas fa-dice mr-2"></i>サイコロを振る
+            </button>
+        </div>
+    </main>
+
+    <!-- 結果モーダル -->
+    <div id="modal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
+            <div class="text-center">
+                <div id="modal-icon" class="text-4xl mb-4 text-indigo-500">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3 id="modal-title" class="text-xl font-bold text-gray-900 mb-2">タイトル</h3>
+                <p id="modal-message" class="text-gray-600 mb-6">メッセージがここに入ります。</p>
+                <button onclick="closeModal()" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded w-full">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報酬獲得モーダル（勉強終了時） -->
+    <div id="reward-modal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 text-center">
+            <div class="text-5xl mb-4 text-yellow-400">
+                <i class="fas fa-trophy"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">勉強お疲れ様！</h3>
+            <p class="text-gray-600 mb-4">今回の成果により報酬を獲得しました。</p>
+            
+            <div class="bg-gray-100 rounded-lg p-4 mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <span><i class="fas fa-clock text-gray-500 mr-2"></i>勉強時間</span>
+                    <span id="reward-time" class="font-bold">0分</span>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span><i class="fas fa-yen-sign text-green-500 mr-2"></i>獲得資金</span>
+                    <span id="reward-money" class="font-bold text-green-600">+0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span><i class="fas fa-dice text-orange-500 mr-2"></i>獲得サイコロ</span>
+                    <span id="reward-dice" class="font-bold text-orange-600">+0</span>
+                </div>
+            </div>
+
+            <button onclick="closeRewardModal()" class="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg w-full shadow-lg hover:bg-indigo-700">
+                報酬を受け取る
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ゲームの状態管理
+        const gameState = {
+            money: 0,
+            dice: 2, // 初期サイコロ
+            level: 1,
+            position: 0,
+            totalStudyTime: 0,
+            isTimerRunning: false,
+            timerStartTime: null,
+            timerInterval: null
+        };
+
+        // 会社レベルの定義
+        const levels = [
+            { level: 1, name: "自宅ガレージ", threshold: 0, icon: "fa-warehouse", color: "text-yellow-300" },
+            { level: 2, name: "コワーキングスペース", threshold: 1000000, icon: "fa-laptop-house", color: "text-green-300" },
+            { level: 3, name: "雑居ビル", threshold: 5000000, icon: "fa-building", color: "text-blue-300" },
+            { level: 4, name: "高層オフィス", threshold: 20000000, icon: "fa-city", color: "text-purple-300" },
+            { level: 5, name: "自社タワー本社", threshold: 100000000, icon: "fa-landmark", color: "text-pink-300" },
+            { level: 6, name: "宇宙ステーション", threshold: 1000000000, icon: "fa-space-shuttle", color: "text-white" }
+        ];
+
+        // ボードの設定 (0-19の20マス)
+        const boardSize = 20;
+        const cellTypes = [
+            'start', 'good', 'bad', 'event', 'good', 
+            'good', 'bad', 'event', 'good', 'company',
+            'bad', 'good', 'event', 'good', 'bad',
+            'event', 'good', 'bad', 'good', 'event'
+        ];
+
+        // セルごとのイベント内容定義
+        function getCellEvent(type) {
+            const baseMoney = 100000 * gameState.level; // レベルに応じて額が変わる
+            
+            switch(type) {
+                case 'start': return { title: "スタート", text: "一周回って給料ゲット！", money: baseMoney * 2, icon: "fa-flag-checkered", color: "text-yellow-500" };
+                case 'good': 
+                    const goodEvents = [
+                        { text: "臨時ボーナスが入った！", multiplier: 0.5 },
+                        { text: "アプリが大ヒット！", multiplier: 1.0 },
+                        { text: "投資家から資金調達！", multiplier: 1.5 }
+                    ];
+                    const gEvt = goodEvents[Math.floor(Math.random() * goodEvents.length)];
+                    return { title: "Good News", text: gEvt.text, money: baseMoney * gEvt.multiplier, icon: "fa-thumbs-up", color: "text-green-500" };
+                case 'bad':
+                    const badEvents = [
+                        { text: "サーバーがダウンした...", multiplier: -0.3 },
+                        { text: "PCが壊れて買い替え...", multiplier: -0.5 },
+                        { text: "無駄なサブスクを払い続けていた...", multiplier: -0.2 }
+                    ];
+                    const bEvt = badEvents[Math.floor(Math.random() * badEvents.length)];
+                    return { title: "Bad News", text: bEvt.text, money: baseMoney * bEvt.multiplier, icon: "fa-exclamation-triangle", color: "text-red-500" };
+                case 'event':
+                     const randEvents = [
+                        { text: "サイコロを拾った", dice: 1, money: 0 },
+                        { text: "勉強会でスキルアップ（小銭ゲット）", dice: 0, money: baseMoney * 0.2 },
+                        { text: "カフェで集中できた", dice: 0, money: baseMoney * 0.1 }
+                    ];
+                    const rEvt = randEvents[Math.floor(Math.random() * randEvents.length)];
+                    return { title: "イベント", text: rEvt.text, money: rEvt.money, dice: rEvt.dice, icon: "fa-star", color: "text-blue-500" };
+                case 'company':
+                    return { title: "決算", text: "事業収益が入りました", money: baseMoney * 3, icon: "fa-chart-pie", color: "text-purple-500" };
+                default: return { title: "", text: "", money: 0 };
+            }
+        }
+
+        // 初期化
+        function init() {
+            loadGame();
+            renderBoard();
+            updateUI();
+        }
+
+        // ボード描画
+        function renderBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+
+            for (let i = 0; i < boardSize; i++) {
+                const cell = document.createElement('div');
+                const type = cellTypes[i];
+                cell.className = `cell cell-${type}`;
+                
+                // アイコン決定
+                let iconClass = '';
+                if(type === 'start') iconClass = 'fa-flag';
+                else if(type === 'good') iconClass = 'fa-yen-sign';
+                else if(type === 'bad') iconClass = 'fa-frown';
+                else if(type === 'event') iconClass = 'fa-question';
+                else if(type === 'company') iconClass = 'fa-building';
+
+                cell.innerHTML = `
+                    <div class="absolute top-1 left-2 text-xs opacity-50 font-mono">${i+1}</div>
+                    <i class="fas ${iconClass} text-xl mb-1"></i>
+                    <span class="text-[10px] font-bold">${getTypeName(type)}</span>
+                `;
+                
+                // プレイヤーの描画
+                if (i === gameState.position) {
+                    const token = document.createElement('div');
+                    token.className = 'player-token';
+                    token.id = 'player-token';
+                    token.innerHTML = '<i class="fas fa-user-astronaut"></i>';
+                    cell.appendChild(token);
+                }
+
+                boardEl.appendChild(cell);
+            }
+        }
+
+        function getTypeName(type) {
+            const names = { start: 'START', good: '収入', bad: '出費', event: '?', company: '決算' };
+            return names[type];
+        }
+
+        // UI更新
+        function updateUI() {
+            document.getElementById('money-display').innerText = gameState.money.toLocaleString();
+            document.getElementById('dice-count-display').innerText = gameState.dice;
+            
+            const currentLvl = levels.find(l => l.level === gameState.level);
+            const nextLvl = levels.find(l => l.level === gameState.level + 1);
+            
+            document.getElementById('company-level-display').innerText = gameState.level;
+            document.getElementById('company-name-display').innerText = currentLvl.name;
+            document.getElementById('company-title').innerText = currentLvl.name;
+
+            const iconEl = document.getElementById('building-icon');
+            iconEl.className = `fas ${currentLvl.icon} building-icon ${currentLvl.color}`;
+
+            // 次のレベルへの進捗
+            const levelText = document.getElementById('next-level-text');
+            const progBar = document.getElementById('level-progress');
+            
+            if (nextLvl) {
+                const prevThreshold = currentLvl.threshold;
+                const nextThreshold = nextLvl.threshold;
+                const needed = nextThreshold - gameState.money;
+                
+                // 進捗率計算（現在のレベル帯での割合）
+                // (現在金 - 現レベル閾値) / (次レベル閾値 - 現レベル閾値)
+                let progressPercent = 0;
+                if (gameState.money >= nextThreshold) {
+                    progressPercent = 100;
+                    checkLevelUp();
+                } else {
+                    const totalRange = nextThreshold - prevThreshold;
+                    const currentProgress = gameState.money - prevThreshold;
+                    progressPercent = Math.max(0, Math.min(100, (currentProgress / totalRange) * 100));
+                    levelText.innerText = `次のレベルまで: ¥${(needed).toLocaleString()}`;
+                }
+                progBar.style.width = `${progressPercent}%`;
+                
+            } else {
+                levelText.innerText = "最高レベル到達！";
+                progBar.style.width = "100%";
+            }
+
+            // ボタン制御
+            document.getElementById('roll-btn').disabled = gameState.dice <= 0;
+            if(gameState.dice <= 0) {
+                 document.getElementById('roll-btn').innerText = "勉強してサイコロをゲット！";
+                 document.getElementById('roll-btn').classList.remove('bg-orange-500', 'hover:bg-orange-600');
+                 document.getElementById('roll-btn').classList.add('bg-gray-400');
+            } else {
+                 document.getElementById('roll-btn').innerHTML = '<i class="fas fa-dice mr-2"></i>サイコロを振る';
+                 document.getElementById('roll-btn').classList.add('bg-orange-500', 'hover:bg-orange-600');
+                 document.getElementById('roll-btn').classList.remove('bg-gray-400');
+            }
+
+            saveGame();
+        }
+
+        // レベルアップチェック
+        function checkLevelUp() {
+            const nextLvl = levels.find(l => l.level === gameState.level + 1);
+            if (nextLvl && gameState.money >= nextLvl.threshold) {
+                gameState.level++;
+                showModal("レベルアップ！", `会社が「${nextLvl.name}」に成長しました！`, "fa-arrow-up", "text-yellow-500");
+                updateUI(); // 再描画してアイコンなどを更新
+            }
+        }
+
+        // タイマー機能
+        function toggleTimer() {
+            const btn = document.getElementById('timer-btn');
+            const timerDisplay = document.getElementById('timer-display');
+            const icon = document.getElementById('timer-status-icon');
+            const text = document.getElementById('timer-text');
+
+            if (!gameState.isTimerRunning) {
+                // スタート
+                gameState.isTimerRunning = true;
+                gameState.timerStartTime = new Date();
+                
+                btn.classList.add('bg-red-500', 'text-white', 'hover:bg-red-600', 'timer-active');
+                btn.classList.remove('bg-white', 'text-indigo-600', 'hover:bg-gray-100');
+                icon.innerHTML = '<i class="fas fa-stop"></i>';
+                text.innerText = "勉強を終了";
+                timerDisplay.classList.remove('hidden');
+
+                gameState.timerInterval = setInterval(updateTimerDisplay, 1000);
+            } else {
+                // ストップ
+                stopTimer();
+            }
+        }
+
+        function updateTimerDisplay() {
+            const now = new Date();
+            const diff = now - gameState.timerStartTime;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            
+            document.getElementById('timer-display').innerText = 
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function stopTimer() {
+            clearInterval(gameState.timerInterval);
+            gameState.isTimerRunning = false;
+            
+            const btn = document.getElementById('timer-btn');
+            const timerDisplay = document.getElementById('timer-display');
+            const icon = document.getElementById('timer-status-icon');
+            const text = document.getElementById('timer-text');
+
+            btn.classList.remove('bg-red-500', 'text-white', 'hover:bg-red-600', 'timer-active');
+            btn.classList.add('bg-white', 'text-indigo-600', 'hover:bg-gray-100');
+            icon.innerHTML = '<i class="fas fa-play"></i>';
+            text.innerText = "勉強を開始";
+            
+            // 報酬計算
+            const endTime = new Date();
+            const diffMs = endTime - gameState.timerStartTime;
+            const diffMinutes = Math.floor(diffMs / 60000); 
+            // デバッグ用: 短時間でもテストできるように、秒単位でも少し報酬を与える
+            // 実運用では最低1分などにする
+            
+            if (diffMinutes >= 1 || diffMs > 10000) { // 1分以上または10秒以上（テスト用）
+                calculateRewards(diffMinutes, diffMs);
+            } else {
+                // 短すぎる場合
+                timerDisplay.classList.add('hidden');
+                alert("勉強時間が短すぎます（最低1分）。");
+            }
+        }
+
+        function calculateRewards(minutes, ms) {
+            // 基本レート: 1分 = 10万円, 5分 = サイコロ1個
+            // より細かい計算: 秒単位で計算
+            const seconds = Math.floor(ms / 1000);
+            
+            // 資金計算 (レベルが高いと時給も上がる設定)
+            const moneyPerSec = (100000 / 60) * (1 + (gameState.level * 0.1)); 
+            const earnedMoney = Math.floor(seconds * moneyPerSec);
+            
+            // サイコロ計算 (5分で1個)
+            let earnedDice = Math.floor(minutes / 5);
+            // 最低保証: 1分以上勉強したら最低でも小銭と、確率でサイコロ
+            if (earnedDice === 0 && minutes >= 1) {
+                if(Math.random() > 0.5) earnedDice = 1; 
+            }
+            // テスト用ボーナス: 1分未満でも10秒以上なら少しあげる
+            if (minutes < 1 && seconds > 10) {
+                 earnedDice = 0; // 短時間はサイコロなし
+            }
+
+            gameState.money += earnedMoney;
+            gameState.dice += earnedDice;
+            gameState.totalStudyTime += minutes;
+
+            // 報酬モーダル表示
+            document.getElementById('reward-time').innerText = 
+                `${Math.floor(seconds/60)}分 ${seconds%60}秒`;
+            document.getElementById('reward-money').innerText = `+¥${earnedMoney.toLocaleString()}`;
+            document.getElementById('reward-dice').innerText = `+${earnedDice}個`;
+            
+            document.getElementById('reward-modal').classList.remove('hidden');
+            
+            updateUI();
+        }
+
+        function closeRewardModal() {
+            document.getElementById('reward-modal').classList.add('hidden');
+            document.getElementById('timer-display').classList.add('hidden');
+            document.getElementById('timer-display').innerText = "00:00:00";
+        }
+
+        // サイコロを振る
+        function rollDice() {
+            if (gameState.dice <= 0) return;
+
+            gameState.dice--;
+            updateUI(); // サイコロ減らす
+
+            const btn = document.getElementById('roll-btn');
+            btn.disabled = true;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-dice dice-rolling mr-2"></i>Rolling...';
+
+            // サイコロ演出
+            setTimeout(() => {
+                const step = Math.floor(Math.random() * 6) + 1;
+                btn.innerHTML = `<i class="fas fa-dice-${['one','two','three','four','five','six'][step-1]} mr-2"></i> ${step}が出た！`;
+                
+                setTimeout(() => {
+                    movePlayer(step);
+                    // ボタンは移動完了後に戻す
+                }, 800);
+
+            }, 1000);
+        }
+
+        // プレイヤー移動
+        function movePlayer(steps) {
+            let currentStep = 0;
+            
+            const moveInterval = setInterval(() => {
+                // 現在位置からトークンを消す
+                renderBoard(); // 非効率だが簡単のため再描画（トークン位置はgameState.position依存）
+
+                gameState.position++;
+                
+                // 一周したかチェック
+                if (gameState.position >= boardSize) {
+                    gameState.position = 0;
+                    // 周回ボーナス
+                    const lapBonus = 500000 * gameState.level;
+                    gameState.money += lapBonus;
+                    showModal("周回ボーナス！", `一周しました！給料 ¥${lapBonus.toLocaleString()} を獲得！`, "fa-flag-checkered", "text-yellow-500");
+                }
+
+                currentStep++;
+
+                // 移動終了
+                if (currentStep >= steps) {
+                    clearInterval(moveInterval);
+                    renderBoard(); // 最終位置描画
+                    setTimeout(triggerCellEvent, 500);
+                    
+                    // ボタンリセット
+                    const btn = document.getElementById('roll-btn');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-dice mr-2"></i>サイコロを振る';
+                    updateUI(); // ボタン状態更新のため
+                } else {
+                    renderBoard(); // 途中経過描画
+                }
+            }, 300); // 1マスの移動速度
+        }
+
+        // イベント発火
+        function triggerCellEvent() {
+            const type = cellTypes[gameState.position];
+            const evt = getCellEvent(type);
+            
+            if (evt.money !== 0 || evt.dice) {
+                gameState.money += evt.money;
+                if(evt.dice) gameState.dice += evt.dice;
+                
+                // お金が0未満にならないように
+                if (gameState.money < 0) gameState.money = 0;
+
+                const moneyText = evt.money > 0 ? `+¥${evt.money.toLocaleString()}` : (evt.money < 0 ? `-¥${Math.abs(evt.money).toLocaleString()}` : '');
+                const diceText = evt.dice ? ` サイコロ+${evt.dice}` : '';
+                
+                showModal(evt.title, `${evt.text}\n\n${moneyText}${diceText}`, evt.icon, evt.color);
+                updateUI();
+            }
+        }
+
+        // 汎用モーダル表示
+        function showModal(title, message, icon, color) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            
+            const iconEl = document.getElementById('modal-icon');
+            iconEl.innerHTML = `<i class="fas ${icon}"></i>`;
+            iconEl.className = `text-4xl mb-4 ${color}`;
+
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        // ローカルストレージ保存
+        function saveGame() {
+            localStorage.setItem('studySugorokuSave', JSON.stringify(gameState));
+        }
+
+        function loadGame() {
+            const save = localStorage.getItem('studySugorokuSave');
+            if (save) {
+                const parsed = JSON.parse(save);
+                // データのマージ（新しいプロパティが増えた場合のため）
+                Object.assign(gameState, parsed);
+                // タイマー状態はリセット
+                gameState.isTimerRunning = false;
+                gameState.timerInterval = null;
+            }
+        }
+
+        // スタート
+        init();
+
+    </script>
+</body>
+</html>
